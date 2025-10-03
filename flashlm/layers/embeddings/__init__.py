@@ -1,9 +1,9 @@
-from .rope import RoPEPositionEmbedding
-from .alibi import ALiBiPositionEmbedding
-from .relative import RelativePositionEmbedding
+from .rope import FastRoPEPositionEmbedding
+from .alibi import FastALiBiPositionEmbedding
+from .relative import FastRelativePositionEmbedding
 
 __all__ = [
-    "RoPEPositionEmbedding",
-    "ALiBiPositionEmbedding", 
-    "RelativePositionEmbedding",
+    "FastRoPEPositionEmbedding",
+    "FastALiBiPositionEmbedding", 
+    "FastRelativePositionEmbedding",
 ]

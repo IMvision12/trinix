@@ -2,12 +2,20 @@ import torch
 import torch.nn as nn
 import math
 
+try:
+    from ...kernels import TritonALiBiKernel
+    TRITON_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    TRITON_AVAILABLE = False
+    TritonALiBiKernel = None
 
-class ALiBiPositionEmbedding(nn.Module):
-    def __init__(self, num_heads: int, max_seq_len: int = 2048):
+
+class FastALiBiPositionEmbedding(nn.Module):
+    def __init__(self, num_heads: int, max_seq_len: int = 2048, use_triton: bool = True):
         super().__init__()
         self.num_heads = num_heads
         self.max_seq_len = max_seq_len
+        self.use_triton = use_triton and TRITON_AVAILABLE
         
         slopes = self._get_slopes(num_heads)
         self.register_buffer("slopes", slopes, persistent=False)
@@ -27,11 +35,22 @@ class ALiBiPositionEmbedding(nn.Module):
         
         return torch.tensor(slopes, dtype=torch.float32)
     
-    def forward(self, seq_len: int) -> torch.Tensor:
-        positions = torch.arange(seq_len).unsqueeze(0) - torch.arange(seq_len).unsqueeze(1)
+    def forward(self, seq_len: int, batch_size: int = 1) -> torch.Tensor:
+        if self.use_triton and TRITON_AVAILABLE and TritonALiBiKernel is not None and TritonALiBiKernel.is_available() and self.slopes.is_cuda:
+            return TritonALiBiKernel.apply(self.slopes, batch_size, self.num_heads, seq_len)
+        else:
+            return self._compute_alibi_pytorch(seq_len, batch_size)
+    
+    def _compute_alibi_pytorch(self, seq_len: int, batch_size: int) -> torch.Tensor:
+        positions = torch.arange(seq_len, device=self.slopes.device).unsqueeze(0) - torch.arange(seq_len, device=self.slopes.device).unsqueeze(1)
         positions = positions.abs()
         
         bias = positions.unsqueeze(0) * self.slopes.unsqueeze(1).unsqueeze(2)
         bias = -bias
+        
+        if batch_size > 1:
+            bias = bias.unsqueeze(0).expand(batch_size, -1, -1, -1)
+        else:
+            bias = bias.unsqueeze(0)
         
         return bias

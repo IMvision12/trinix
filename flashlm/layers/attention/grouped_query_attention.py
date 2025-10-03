@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional, Tuple, Union
 from .base import FastBaseAttention
-from ..embeddings import RoPEPositionEmbedding, ALiBiPositionEmbedding, RelativePositionEmbedding
+from ..embeddings import FastRoPEPositionEmbedding, FastALiBiPositionEmbedding, FastRelativePositionEmbedding
 
 
 class FastGroupedQueryAttention(FastBaseAttention):
@@ -24,6 +24,7 @@ class FastGroupedQueryAttention(FastBaseAttention):
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
         qk_layer_norm: bool = False,
+        use_triton_embeddings: bool = True,
     ):
         super().__init__(embed_dim, num_heads, dropout, bias, kernel_type, causal)
         
@@ -46,21 +47,24 @@ class FastGroupedQueryAttention(FastBaseAttention):
         self.o_proj = nn.Linear(num_heads * self.head_dim, embed_dim, bias=bias)
         
         if position_method == "rope":
-            self.position_embedding = RoPEPositionEmbedding(
+            self.position_embedding = FastRoPEPositionEmbedding(
                 dim=self.head_dim,
                 max_position_embeddings=max_seq_len,
-                base=rope_base
+                base=rope_base,
+                use_triton=use_triton_embeddings
             )
         elif position_method == "alibi":
-            self.position_embedding = ALiBiPositionEmbedding(
+            self.position_embedding = FastALiBiPositionEmbedding(
                 num_heads=num_heads,
-                max_seq_len=max_seq_len
+                max_seq_len=max_seq_len,
+                use_triton=use_triton_embeddings
             )
         elif position_method == "relative":
-            self.position_embedding = RelativePositionEmbedding(
+            self.position_embedding = FastRelativePositionEmbedding(
                 num_heads=num_heads,
                 head_dim=self.head_dim,
-                max_relative_position=max_relative_position
+                max_relative_position=max_relative_position,
+                use_triton=use_triton_embeddings
             )
         else:
             self.position_embedding = None
@@ -80,12 +84,12 @@ class FastGroupedQueryAttention(FastBaseAttention):
             if proj.bias is not None:
                 nn.init.constant_(proj.bias, 0.0)
     
-    def _apply_sliding_window_mask(self, attention_mask: torch.Tensor, seq_len: int) -> torch.Tensor:
+    def _apply_sliding_window_mask(self, attention_mask: Optional[torch.Tensor], seq_len: int, device: torch.device) -> Optional[torch.Tensor]:
         if not self.use_sliding_window or self.sliding_window_size is None:
             return attention_mask
         
         window_mask = torch.triu(
-            torch.ones(seq_len, seq_len, device=attention_mask.device),
+            torch.ones(seq_len, seq_len, device=device),
             diagonal=-self.sliding_window_size
         )
         window_mask = torch.tril(window_mask, diagonal=0)
@@ -103,17 +107,19 @@ class FastGroupedQueryAttention(FastBaseAttention):
         self, 
         q: torch.Tensor, 
         k: torch.Tensor, 
-        seq_len: int
+        seq_len: int,
+        batch_size: int,
+        position_ids: Optional[torch.Tensor] = None
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         position_bias = None
         
         if self.position_method == "rope" and self.position_embedding is not None:
             cos, sin = self.position_embedding(q, seq_len)
-            q, k = self.position_embedding.apply_rotary_pos_emb(q, k, cos, sin)
+            q, k = self.position_embedding.apply_rotary_pos_emb(q, k, cos, sin, position_ids)
         elif self.position_method == "alibi" and self.position_embedding is not None:
-            position_bias = self.position_embedding(seq_len)
+            position_bias = self.position_embedding(seq_len, batch_size)
         elif self.position_method == "relative" and self.position_embedding is not None:
-            position_bias = self.position_embedding(seq_len)
+            position_bias = self.position_embedding(seq_len, batch_size)
         
         return q, k, position_bias
     
@@ -130,6 +136,7 @@ class FastGroupedQueryAttention(FastBaseAttention):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        position_ids: Optional[torch.Tensor] = None,
         past_key_value: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         use_cache: bool = False,
         **kwargs,
@@ -141,9 +148,14 @@ class FastGroupedQueryAttention(FastBaseAttention):
         k = self.k_proj(hidden_states)
         v = self.v_proj(hidden_states)
         
-        q = q.view(bs, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = k.view(bs, seq_len, self.num_kv_heads, self.head_dim).transpose(1, 2)
-        v = v.view(bs, seq_len, self.num_kv_heads, self.head_dim).transpose(1, 2)
+        q = q.view(bs, seq_len, self.num_heads, self.head_dim)
+        k = k.view(bs, seq_len, self.num_kv_heads, self.head_dim)
+        v = v.view(bs, seq_len, self.num_kv_heads, self.head_dim)
+        
+        q, k, position_bias = self._apply_position_embedding(q, k, seq_len, bs, position_ids)
+        q = q.transpose(1, 2)
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
         
         if self.qk_layer_norm:
             q = self.q_norm(q)
@@ -155,8 +167,6 @@ class FastGroupedQueryAttention(FastBaseAttention):
             v = torch.cat([past_v, v], dim=-2)
             seq_len = k.shape[-2]
         
-        q, k, position_bias = self._apply_position_embedding(q, k, seq_len)
-        
         k = self._tile_kv_heads(k, self.num_key_value_groups)
         v = self._tile_kv_heads(v, self.num_key_value_groups)
         
@@ -165,7 +175,7 @@ class FastGroupedQueryAttention(FastBaseAttention):
         v = v.transpose(1, 2)
         
         if self.use_sliding_window:
-            attention_mask = self._apply_sliding_window_mask(attention_mask, seq_len)
+            attention_mask = self._apply_sliding_window_mask(attention_mask, seq_len, hidden_states.device)
         
         if position_bias is not None:
             if attention_mask is not None:
@@ -173,7 +183,13 @@ class FastGroupedQueryAttention(FastBaseAttention):
             else:
                 attention_mask = position_bias
         
-        out = self.forward_attention(q, k, v, attention_mask)
+        if attention_mask is not None and self.kernel_type == "flash":
+            original_kernel = self.kernel_type
+            self.kernel_type = "pytorch"
+            out = self.forward_attention(q, k, v, attention_mask)
+            self.kernel_type = original_kernel
+        else:
+            out = self.forward_attention(q, k, v, attention_mask)
         out = out.reshape(bs, seq_len, -1)
         out = self.o_proj(out)
         
