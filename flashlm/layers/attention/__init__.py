@@ -1,13 +1,21 @@
+from .base import FastBaseAttention
 from .grouped_query_attention import FastGroupedQueryAttention
-from ..embeddings import (
-    FastRoPEPositionEmbedding,
-    FastALiBiPositionEmbedding,
-    FastRelativePositionEmbedding,
+from .multihead_attention import FastMultiHeadAttention
+from .multihead_self_attention import FastMultiHeadSelfAttention
+from .custom_position_embedding import (
+    BaseCustomPositionEmbedding,
+    ExampleSinusoidalPositionEmbedding,
+    ExampleLearnablePositionEmbedding,
+    ExampleBiasOnlyPositionEmbedding,
 )
 
 __all__ = [
+    "FastBaseAttention",
     "FastGroupedQueryAttention",
-    "FastRoPEPositionEmbedding",
-    "FastALiBiPositionEmbedding", 
-    "FastRelativePositionEmbedding",
+    "FastMultiHeadAttention",
+    "FastMultiHeadSelfAttention",
+    "BaseCustomPositionEmbedding",
+    "ExampleSinusoidalPositionEmbedding",
+    "ExampleLearnablePositionEmbedding",
+    "ExampleBiasOnlyPositionEmbedding",
 ]

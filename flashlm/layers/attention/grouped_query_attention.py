@@ -17,7 +17,7 @@ class FastGroupedQueryAttention(FastBaseAttention):
         kernel_type: str = "flash",
         causal: bool = False,
         head_dim: Optional[int] = None,
-        position_method: str = "none",
+        position_method: Union[str, nn.Module] = "none",
         max_seq_len: int = 2048,
         rope_base: float = 10000.0,
         max_relative_position: int = 128,
@@ -25,11 +25,17 @@ class FastGroupedQueryAttention(FastBaseAttention):
         sliding_window_size: Optional[int] = None,
         qk_layer_norm: bool = False,
         use_triton_embeddings: bool = True,
+
     ):
         super().__init__(embed_dim, num_heads, dropout, bias, kernel_type, causal)
         
         assert num_heads % num_kv_heads == 0, f"num_heads ({num_heads}) must be divisible by num_kv_heads ({num_kv_heads})"
-        assert position_method in ["rope", "alibi", "relative", "none"], f"Invalid position_method: {position_method}"
+        if isinstance(position_method, str):
+            assert position_method in ["rope", "alibi", "relative", "none"] or position_method.startswith("custom"), f"Invalid position_method: {position_method}. Use 'rope', 'alibi', 'relative', 'none', or provide a custom nn.Module."
+        elif isinstance(position_method, nn.Module):
+            pass
+        else:
+            raise TypeError(f"position_method must be a string or nn.Module, got {type(position_method)}")
         
         self.head_dim = head_dim if head_dim is not None else embed_dim // num_heads
         self.num_kv_heads = num_kv_heads
@@ -46,7 +52,10 @@ class FastGroupedQueryAttention(FastBaseAttention):
         self.v_proj = nn.Linear(embed_dim, num_kv_heads * self.head_dim, bias=bias)
         self.o_proj = nn.Linear(num_heads * self.head_dim, embed_dim, bias=bias)
         
-        if position_method == "rope":
+        if isinstance(position_method, nn.Module):
+            self.position_embedding = position_method
+            self.position_method = "custom"
+        elif position_method == "rope":
             self.position_embedding = FastRoPEPositionEmbedding(
                 dim=self.head_dim,
                 max_position_embeddings=max_seq_len,
@@ -120,6 +129,30 @@ class FastGroupedQueryAttention(FastBaseAttention):
             position_bias = self.position_embedding(seq_len, batch_size)
         elif self.position_method == "relative" and self.position_embedding is not None:
             position_bias = self.position_embedding(seq_len, batch_size)
+        elif self.position_method == "custom" and self.position_embedding is not None:
+            # For custom position embeddings, try to call with standard parameters
+            # The custom implementation should handle the specific interface
+            try:
+                # Try the standard interface first (returns modified q, k and optional bias)
+                result = self.position_embedding(q, k, seq_len, batch_size, position_ids)
+                if isinstance(result, tuple) and len(result) == 3:
+                    q, k, position_bias = result
+                elif isinstance(result, tuple) and len(result) == 2:
+                    q, k = result
+                else:
+                    # If single return value, assume it's position_bias
+                    position_bias = result
+            except TypeError:
+                # Fallback: try with just q, k
+                try:
+                    result = self.position_embedding(q, k)
+                    if isinstance(result, tuple):
+                        q, k = result
+                    else:
+                        position_bias = result
+                except:
+                    # Last resort: call with no args and assume bias return
+                    position_bias = self.position_embedding()
         
         return q, k, position_bias
     
