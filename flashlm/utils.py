@@ -75,20 +75,21 @@ def benchmark_kernels(
         device = "cpu"
         warnings.warn("CUDA not available, benchmarking on CPU")
     
-    from .layers.attention import FastMultiHeadSelfAttention
+    from .layers.attention import FastGroupedQueryAttention
     
     results = {}
     available_kernels = get_available_kernels()
     
-    x = torch.randn(batch_size, seq_len, embed_dim, device=device)
+    x = torch.randn(batch_size, seq_len, embed_dim, device=device, dtype=torch.float32)
     
     for kernel_type in ["pytorch", "flash", "triton"]:
         if not available_kernels[kernel_type]:
             continue
         
-        attn = FastMultiHeadSelfAttention(
+        attn = FastGroupedQueryAttention(
             embed_dim=embed_dim,
             num_heads=num_heads,
+            num_kv_heads=num_heads // 2,
             kernel_type=kernel_type
         ).to(device)
         

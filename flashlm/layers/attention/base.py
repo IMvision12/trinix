@@ -99,6 +99,13 @@ class FastBaseAttention(nn.Module):
             attn_weights.masked_fill_(causal_mask, float('-inf'))
         
         if attn_mask is not None:
+            if attn_mask.dim() == 4:
+                attn_mask = attn_mask.reshape(batch_size * num_heads, seq_len, seq_len)
+            elif attn_mask.dim() == 3:
+                pass
+            elif attn_mask.dim() == 2:
+                attn_mask = attn_mask.unsqueeze(0).expand(batch_size * num_heads, -1, -1)
+            
             attn_weights += attn_mask
         
         attn_weights = F.softmax(attn_weights, dim=-1)
@@ -106,7 +113,7 @@ class FastBaseAttention(nn.Module):
         
         out = torch.bmm(attn_weights, v)
         
-        out = out.view(batch_size, num_heads, seq_len, head_dim).transpose(1, 2)
+        out = out.reshape(batch_size, num_heads, seq_len, head_dim).transpose(1, 2)
         
         return out
     
