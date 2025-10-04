@@ -1,5 +1,4 @@
-from . import attention
-from . import embeddings
+from . import attention, embeddings
 
 # Import all classes for direct access
 from .attention import (
@@ -9,9 +8,9 @@ from .attention import (
     FastMultiHeadSelfAttention,
 )
 from .embeddings import (
-    FastRoPEPositionEmbedding,
     FastALiBiPositionEmbedding,
     FastRelativePositionEmbedding,
+    FastRoPEPositionEmbedding,
 )
 
 __all__ = [

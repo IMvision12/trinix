@@ -1,5 +1,9 @@
-from . import layers
-from . import kernels
+from . import kernels, layers
+from .kernels import (
+    TritonALiBiKernel,
+    TritonRelativeKernel,
+    TritonRoPEKernel,
+)
 from .layers.attention import (
     FastBaseAttention,
     FastGroupedQueryAttention,
@@ -7,14 +11,9 @@ from .layers.attention import (
     FastMultiHeadSelfAttention,
 )
 from .layers.embeddings import (
-    FastRoPEPositionEmbedding,
     FastALiBiPositionEmbedding,
     FastRelativePositionEmbedding,
-)
-from .kernels import (
-    TritonRoPEKernel,
-    TritonALiBiKernel,
-    TritonRelativeKernel,
+    FastRoPEPositionEmbedding,
 )
 
 __version__ = "0.1.0"
