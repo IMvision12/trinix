@@ -9,11 +9,14 @@ def format_repository(repo_path: str, line_length: int = 88):
     repo_path = os.path.abspath(repo_path)
     print(f"Formatting repository at: {repo_path}")
 
-    python_files = list(Path(repo_path).rglob("*.py"))
+    python_files = []
+    exclude_dirs = {"venv", ".env", "env", "__pycache__", ".git", ".ruff_cache"}
 
-    python_files = [
-        f for f in python_files if "venv" not in str(f) and ".env" not in str(f)
-    ]
+    for root, dirs, files in os.walk(repo_path):
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        for file in files:
+            if file.endswith(".py"):
+                python_files.append(Path(root) / file)
 
     if not python_files:
         print("No Python files found in the repository.")

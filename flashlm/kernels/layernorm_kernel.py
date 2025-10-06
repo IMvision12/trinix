@@ -1,11 +1,26 @@
 from typing import Optional, Tuple
+
 import torch
 import triton
 import triton.language as tl
+
 from .utils import calculate_triton_kernel_configuration
 
+
 @triton.jit
-def layernorm_forward_kernel(Y_ptr, Y_row_stride, X_ptr, X_row_stride, W_ptr, b_ptr, rstd_ptr, mean_ptr, n_cols: tl.constexpr, eps: tl.constexpr, BLOCK_SIZE: tl.constexpr):
+def layernorm_forward_kernel(
+    Y_ptr,
+    Y_row_stride,
+    X_ptr,
+    X_row_stride,
+    W_ptr,
+    b_ptr,
+    rstd_ptr,
+    mean_ptr,
+    n_cols: tl.constexpr,
+    eps: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -25,8 +40,24 @@ def layernorm_forward_kernel(Y_ptr, Y_row_stride, X_ptr, X_row_stride, W_ptr, b_
     output = X_centered * inv_var * W_row + b_row
     tl.store(Y_ptr + col_offsets, output, mask=mask)
 
+
 @triton.jit
-def layernorm_backward_kernel_fused(dY_ptr, dY_row_stride, X_ptr, X_row_stride, W_ptr, rstd_ptr, mean_ptr, dX_ptr, dX_row_stride, dW_ptr, db_ptr, n_cols: tl.constexpr, eps: tl.constexpr, BLOCK_SIZE: tl.constexpr):
+def layernorm_backward_kernel_fused(
+    dY_ptr,
+    dY_row_stride,
+    X_ptr,
+    X_row_stride,
+    W_ptr,
+    rstd_ptr,
+    mean_ptr,
+    dX_ptr,
+    dX_row_stride,
+    dW_ptr,
+    db_ptr,
+    n_cols: tl.constexpr,
+    eps: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -56,8 +87,25 @@ def layernorm_backward_kernel_fused(dY_ptr, dY_row_stride, X_ptr, X_row_stride, 
     dX_row = dX_row * inv_var
     tl.store(dX_ptr + col_offsets, dX_row, mask=mask)
 
+
 @triton.jit
-def layernorm_backward_kernel_welford(dY_ptr, dY_row_stride, X_ptr, X_row_stride, W_ptr, rstd_ptr, mean_ptr, dX_ptr, dX_row_stride, dW_ptr, db_ptr, Lock_ptr, n_cols: tl.constexpr, eps: tl.constexpr, BLOCK_SIZE: tl.constexpr):
+def layernorm_backward_kernel_welford(
+    dY_ptr,
+    dY_row_stride,
+    X_ptr,
+    X_row_stride,
+    W_ptr,
+    rstd_ptr,
+    mean_ptr,
+    dX_ptr,
+    dX_row_stride,
+    dW_ptr,
+    db_ptr,
+    Lock_ptr,
+    n_cols: tl.constexpr,
+    eps: tl.constexpr,
+    BLOCK_SIZE: tl.constexpr,
+):
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -90,8 +138,8 @@ def layernorm_backward_kernel_welford(dY_ptr, dY_row_stride, X_ptr, X_row_stride
     dX_row = dX_row * inv_var
     tl.store(dX_ptr + col_offsets, dX_row, mask=mask)
 
-class TritonLayerNormFunction(torch.autograd.Function):
 
+class TritonLayerNormFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, X, W, b, eps):
         shape = X.shape
@@ -103,7 +151,20 @@ class TritonLayerNormFunction(torch.autograd.Function):
         Y = torch.empty((n_rows, n_cols), dtype=X.dtype, device=device)
         rstd = torch.empty(n_rows, dtype=torch.float32, device=device)
         mean = torch.empty(n_rows, dtype=torch.float32, device=device)
-        layernorm_forward_kernel[n_rows,](Y, Y.stride(0), X, X.stride(0), W, b, rstd, mean, n_cols, eps, BLOCK_SIZE=BLOCK_SIZE, num_warps=num_warps)
+        layernorm_forward_kernel[n_rows,](
+            Y,
+            Y.stride(0),
+            X,
+            X.stride(0),
+            W,
+            b,
+            rstd,
+            mean,
+            n_cols,
+            eps,
+            BLOCK_SIZE=BLOCK_SIZE,
+            num_warps=num_warps,
+        )
         ctx.eps = eps
         ctx.BLOCK_SIZE = BLOCK_SIZE
         ctx.num_warps = num_warps
@@ -123,21 +184,57 @@ class TritonLayerNormFunction(torch.autograd.Function):
         db = torch.zeros(n_cols, dtype=X.dtype, device=device)
         if n_rows <= 32:
             Lock = torch.zeros(1, dtype=torch.int32, device=device)
-            layernorm_backward_kernel_welford[n_rows,](dY, dY.stride(0), X, X.stride(0), W, rstd, mean, dX, dX.stride(0), dW, db, Lock, n_cols, ctx.eps, BLOCK_SIZE=ctx.BLOCK_SIZE, num_warps=ctx.num_warps)
+            layernorm_backward_kernel_welford[n_rows,](
+                dY,
+                dY.stride(0),
+                X,
+                X.stride(0),
+                W,
+                rstd,
+                mean,
+                dX,
+                dX.stride(0),
+                dW,
+                db,
+                Lock,
+                n_cols,
+                ctx.eps,
+                BLOCK_SIZE=ctx.BLOCK_SIZE,
+                num_warps=ctx.num_warps,
+            )
         else:
-            layernorm_backward_kernel_fused[n_rows,](dY, dY.stride(0), X, X.stride(0), W, rstd, mean, dX, dX.stride(0), dW, db, n_cols, ctx.eps, BLOCK_SIZE=ctx.BLOCK_SIZE, num_warps=ctx.num_warps)
+            layernorm_backward_kernel_fused[n_rows,](
+                dY,
+                dY.stride(0),
+                X,
+                X.stride(0),
+                W,
+                rstd,
+                mean,
+                dX,
+                dX.stride(0),
+                dW,
+                db,
+                n_cols,
+                ctx.eps,
+                BLOCK_SIZE=ctx.BLOCK_SIZE,
+                num_warps=ctx.num_warps,
+            )
         return (dX.view(*shape), dW, db, None)
 
-class OptimizedLayerNormKernel:
 
+class OptimizedLayerNormKernel:
     @staticmethod
-    def apply(x: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor, eps: float=1e-05) -> torch.Tensor:
+    def apply(
+        x: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor, eps: float = 1e-05
+    ) -> torch.Tensor:
         return OptimizedLayerNormFunction.apply(x, weight, bias, eps)
 
     @staticmethod
     def is_available() -> bool:
         try:
             import triton
+
             return torch.cuda.is_available()
         except ImportError:
             return False

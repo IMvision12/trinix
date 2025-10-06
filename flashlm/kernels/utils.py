@@ -1,11 +1,13 @@
 import torch
 import triton
 
+
 def get_cuda_compute_capability():
     if not torch.cuda.is_available():
         return 75
     device_properties = torch.cuda.get_device_properties(0)
     return device_properties.major * 10 + device_properties.minor
+
 
 def calculate_triton_kernel_configuration(input_vector_length):
     optimal_block_size = triton.next_power_of_2(input_vector_length)
