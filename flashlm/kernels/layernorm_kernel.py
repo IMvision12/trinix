@@ -221,20 +221,3 @@ class TritonLayerNormFunction(torch.autograd.Function):
                 num_warps=ctx.num_warps,
             )
         return (dX.view(*shape), dW, db, None)
-
-
-class OptimizedLayerNormKernel:
-    @staticmethod
-    def apply(
-        x: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor, eps: float = 1e-05
-    ) -> torch.Tensor:
-        return OptimizedLayerNormFunction.apply(x, weight, bias, eps)
-
-    @staticmethod
-    def is_available() -> bool:
-        try:
-            import triton
-
-            return torch.cuda.is_available()
-        except ImportError:
-            return False
