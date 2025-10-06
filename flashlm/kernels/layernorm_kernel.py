@@ -221,3 +221,17 @@ class TritonLayerNormFunction(torch.autograd.Function):
                 num_warps=ctx.num_warps,
             )
         return (dX.view(*shape), dW, db, None)
+
+
+class TritonLayerNormKernel:
+    @staticmethod
+    def is_available() -> bool:
+        try:
+            import triton
+            return torch.cuda.is_available()
+        except ImportError:
+            return False
+    
+    @staticmethod
+    def apply(X: torch.Tensor, W: torch.Tensor, b: torch.Tensor, eps: float) -> torch.Tensor:
+        return TritonLayerNormFunction.apply(X, W, b, eps)

@@ -5,9 +5,13 @@ from .kernels import (
     TritonRelativeKernel,
     TritonRMSNormKernel,
     TritonRoPEKernel,
-    calculate_triton_kernel_configuration,
-    get_cuda_compute_capability,
 )
+
+try:
+    from .kernels import calculate_triton_kernel_configuration, get_cuda_compute_capability
+except ImportError:
+    calculate_triton_kernel_configuration = None
+    get_cuda_compute_capability = None
 from .layers.attention import (
     FastBaseAttention,
     FastGroupedQueryAttention,
