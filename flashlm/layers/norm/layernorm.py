@@ -10,7 +10,7 @@ class FastLayerNorm(nn.Module):
         normalized_shape: int,
         eps: float = 1e-05,
         elementwise_affine: bool = True,
-        triton: bool = False,
+        use_triton: bool = True,
     ):
         super().__init__()
         if isinstance(normalized_shape, int):
@@ -18,7 +18,7 @@ class FastLayerNorm(nn.Module):
         self.normalized_shape = tuple(normalized_shape)
         self.eps = eps
         self.elementwise_affine = elementwise_affine
-        self.triton = triton
+        self.use_triton = use_triton
         self.pytorch_layernorm = nn.LayerNorm(
             normalized_shape=normalized_shape,
             eps=eps,
@@ -32,7 +32,7 @@ class FastLayerNorm(nn.Module):
             self.bias = None
 
     def _check_triton_availability(self) -> bool:
-        if not self.triton:
+        if not self.use_triton:
             return False
         if not TritonLayerNormKernel.is_available():
             return False
@@ -72,4 +72,4 @@ class FastLayerNorm(nn.Module):
             return self._pytorch_forward(input)
 
     def extra_repr(self) -> str:
-        return f"{self.normalized_shape}, eps={self.eps}, elementwise_affine={self.elementwise_affine}, triton={self.triton}"
+        return f"{self.normalized_shape}, eps={self.eps}, elementwise_affine={self.elementwise_affine}, use_triton={self.use_triton}"
