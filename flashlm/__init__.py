@@ -3,6 +3,7 @@ from .kernels import (
     TritonALiBiKernel,
     TritonLayerNormKernel,
     TritonRelativeKernel,
+    TritonRMSNormKernel,
     TritonRoPEKernel,
     calculate_triton_kernel_configuration,
     get_cuda_compute_capability,
@@ -18,6 +19,7 @@ from .layers.embeddings import (
     FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
+from .layers.norm import FastLayerNorm, FastRMSNorm
 
 __version__ = "0.1.0"
 __all__ = [
@@ -30,10 +32,13 @@ __all__ = [
     "FastRoPEPositionEmbedding",
     "FastALiBiPositionEmbedding",
     "FastRelativePositionEmbedding",
+    "FastLayerNorm",
+    "FastRMSNorm",
     "TritonRoPEKernel",
     "TritonALiBiKernel",
     "TritonRelativeKernel",
     "TritonLayerNormKernel",
+    "TritonRMSNormKernel",
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
 ]

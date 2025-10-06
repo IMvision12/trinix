@@ -10,7 +10,7 @@ from .embeddings import (
     FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
-from .norm import FastLayerNorm
+from .norm import FastLayerNorm, FastRMSNorm
 
 __all__ = [
     "attention",
@@ -24,4 +24,5 @@ __all__ = [
     "FastALiBiPositionEmbedding",
     "FastRelativePositionEmbedding",
     "FastLayerNorm",
+    "FastRMSNorm",
 ]
