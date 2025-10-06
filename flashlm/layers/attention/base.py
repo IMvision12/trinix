@@ -45,7 +45,7 @@ class FastBaseAttention(nn.Module):
             f"embed_dim ({embed_dim}) must be divisible by num_heads ({num_heads})"
         )
         assert num_heads > 0, f"num_heads must be positive, got {num_heads}"
-        
+
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
@@ -58,7 +58,7 @@ class FastBaseAttention(nn.Module):
         self.add_zero_attn = add_zero_attn
         self.max_seq_len = max_seq_len
         self.scaling = self.head_dim ** (-0.5)
-        
+
         if kernel_type == "flash" and (not FLASH_ATTN_AVAILABLE):
             warnings.warn("Flash Attention not available, falling back to PyTorch")
             self.kernel_type = "pytorch"
@@ -66,12 +66,20 @@ class FastBaseAttention(nn.Module):
             warnings.warn("Triton not available, falling back to PyTorch")
             self.kernel_type = "pytorch"
         self.scale = self.head_dim ** (-0.5)
-        
+
         # Validate and setup position method
         self._validate_position_method(position_method)
-        self.position_method = position_method if isinstance(position_method, str) else "custom"
-        self._setup_position_embedding(position_method, max_seq_len, rope_base, max_relative_position, use_triton_embeddings)
-        
+        self.position_method = (
+            position_method if isinstance(position_method, str) else "custom"
+        )
+        self._setup_position_embedding(
+            position_method,
+            max_seq_len,
+            rope_base,
+            max_relative_position,
+            use_triton_embeddings,
+        )
+
         # Setup QK layer norm
         if qk_layer_norm:
             self.q_norm = nn.LayerNorm(self.head_dim, elementwise_affine=False)
@@ -79,7 +87,7 @@ class FastBaseAttention(nn.Module):
         else:
             self.q_norm = None
             self.k_norm = None
-    
+
     def _validate_position_method(self, position_method: Union[str, nn.Module]):
         if isinstance(position_method, str):
             assert position_method in [
@@ -94,7 +102,7 @@ class FastBaseAttention(nn.Module):
             raise TypeError(
                 f"position_method must be a string or nn.Module, got {type(position_method)}"
             )
-    
+
     def _setup_position_embedding(
         self,
         position_method: Union[str, nn.Module],
@@ -108,7 +116,7 @@ class FastBaseAttention(nn.Module):
             FastRelativePositionEmbedding,
             FastRoPEPositionEmbedding,
         )
-        
+
         if isinstance(position_method, nn.Module):
             self.position_embedding = position_method
         elif position_method == "rope":
@@ -150,7 +158,7 @@ class FastBaseAttention(nn.Module):
         else:
             attention_mask = window_mask
         return attention_mask
-    
+
     def _apply_position_embedding(
         self,
         q: torch.Tensor,
@@ -164,10 +172,10 @@ class FastBaseAttention(nn.Module):
             seq_len_k = seq_len_q
         if batch_size is None:
             batch_size = q.shape[0]
-        
+
         position_bias = None
         max_seq_len = max(seq_len_q, seq_len_k)
-        
+
         if self.position_method == "rope" and self.position_embedding is not None:
             cos, sin = self.position_embedding(q, max_seq_len)
             q, k = self.position_embedding.apply_rotary_pos_emb(
@@ -202,7 +210,7 @@ class FastBaseAttention(nn.Module):
                 except:
                     position_bias = self.position_embedding()
         return (q, k, position_bias)
-    
+
     def _add_zero_attention(
         self, k: torch.Tensor, v: torch.Tensor, attention_mask: Optional[torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
@@ -224,9 +232,11 @@ class FastBaseAttention(nn.Module):
             )
             attention_mask = torch.cat([attention_mask, zero_mask], dim=-1)
         return (k, v, attention_mask)
-    
+
     def _merge_position_bias(
-        self, attention_mask: Optional[torch.Tensor], position_bias: Optional[torch.Tensor]
+        self,
+        attention_mask: Optional[torch.Tensor],
+        position_bias: Optional[torch.Tensor],
     ) -> Optional[torch.Tensor]:
         if position_bias is not None:
             if attention_mask is not None:
@@ -263,7 +273,7 @@ class FastBaseAttention(nn.Module):
     ) -> torch.Tensor:
         batch_size, seq_len, num_heads, head_dim = q.shape
         seq_len_k = k.shape[1]
-        
+
         q = (
             q.transpose(1, 2)
             .contiguous()
@@ -279,18 +289,20 @@ class FastBaseAttention(nn.Module):
             .contiguous()
             .view(batch_size * num_heads, seq_len_k, head_dim)
         )
-        
+
         attn_weights = torch.bmm(q, k.transpose(-2, -1)) * self.scale
-        
+
         if self.causal:
             causal_mask = torch.triu(
                 torch.ones(seq_len, seq_len_k, device=q.device), diagonal=1
             ).bool()
             attn_weights.masked_fill_(causal_mask, float("-inf"))
-        
+
         if attn_mask is not None:
             if attn_mask.dim() == 4:
-                attn_mask = attn_mask.reshape(batch_size * num_heads, seq_len, seq_len_k)
+                attn_mask = attn_mask.reshape(
+                    batch_size * num_heads, seq_len, seq_len_k
+                )
             elif attn_mask.dim() == 3:
                 pass
             elif attn_mask.dim() == 2:
@@ -298,13 +310,13 @@ class FastBaseAttention(nn.Module):
                     batch_size * num_heads, -1, -1
                 )
             attn_weights += attn_mask
-        
+
         attn_weights = F.softmax(attn_weights, dim=-1)
         attn_weights = F.dropout(attn_weights, p=self.dropout, training=self.training)
-        
+
         out = torch.bmm(attn_weights, v)
         out = out.reshape(batch_size, num_heads, seq_len, head_dim).transpose(1, 2)
-        
+
         return out
 
     def _apply_triton_attention(
@@ -329,7 +341,7 @@ class FastBaseAttention(nn.Module):
                 "Flash Attention doesn't support custom masks, falling back to PyTorch"
             )
             return self._apply_pytorch_attention(q, k, v, attn_mask)
-        
+
         if self.kernel_type == "flash":
             return self._apply_flash_attention(q, k, v, attn_mask)
         elif self.kernel_type == "triton":

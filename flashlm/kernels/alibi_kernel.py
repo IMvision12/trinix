@@ -2,6 +2,8 @@ import torch
 import triton
 import triton.language as tl
 
+from .utils import calculate_triton_kernel_configuration
+
 
 @triton.jit
 def alibi_bias_kernel(
@@ -43,7 +45,7 @@ class TritonALiBiFunction(torch.autograd.Function):
             device=slopes.device,
             dtype=slopes.dtype,
         )
-        BLOCK_SIZE_J = triton.next_power_of_2(seq_len)
+        BLOCK_SIZE_J, num_warps = calculate_triton_kernel_configuration(seq_len)
         grid = (batch_size, num_heads, seq_len)
         alibi_bias_kernel[grid](
             bias,
@@ -56,6 +58,7 @@ class TritonALiBiFunction(torch.autograd.Function):
             bias.stride(2),
             bias.stride(3),
             BLOCK_SIZE_J=BLOCK_SIZE_J,
+            num_warps=num_warps,
         )
         return bias
 

@@ -2,6 +2,7 @@ import warnings
 
 try:
     import triton
+
     TRITON_AVAILABLE = True
 except ImportError:
     TRITON_AVAILABLE = False
@@ -9,12 +10,15 @@ except ImportError:
 
 if TRITON_AVAILABLE:
     from .alibi_kernel import TritonALiBiKernel
+    from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
     from .relative_kernel import TritonRelativeKernel
     from .rmsnorm_kernel import TritonRMSNormKernel
     from .rope_kernel import TritonRoPEKernel
-    from .layernorm_kernel import TritonLayerNormKernel, TritonLayerNormFunction
-    from .utils import calculate_triton_kernel_configuration, get_cuda_compute_capability
-    
+    from .utils import (
+        calculate_triton_kernel_configuration,
+        get_cuda_compute_capability,
+    )
+
     __all__ = [
         "TritonRoPEKernel",
         "TritonALiBiKernel",
@@ -26,31 +30,32 @@ if TRITON_AVAILABLE:
         "get_cuda_compute_capability",
     ]
 else:
+
     class TritonALiBiKernel:
         @staticmethod
         def is_available():
             return False
-    
+
     class TritonRelativeKernel:
         @staticmethod
         def is_available():
             return False
-    
+
     class TritonRMSNormKernel:
         @staticmethod
         def is_available():
             return False
-    
+
     class TritonRoPEKernel:
         @staticmethod
         def is_available():
             return False
-    
+
     class TritonLayerNormKernel:
         @staticmethod
         def is_available():
             return False
-    
+
     __all__ = [
         "TritonRoPEKernel",
         "TritonALiBiKernel",

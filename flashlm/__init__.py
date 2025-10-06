@@ -8,7 +8,10 @@ from .kernels import (
 )
 
 try:
-    from .kernels import calculate_triton_kernel_configuration, get_cuda_compute_capability
+    from .kernels import (
+        calculate_triton_kernel_configuration,
+        get_cuda_compute_capability,
+    )
 except ImportError:
     calculate_triton_kernel_configuration = None
     get_cuda_compute_capability = None

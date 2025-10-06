@@ -4,6 +4,8 @@ import torch
 import triton
 import triton.language as tl
 
+from .utils import calculate_triton_kernel_configuration
+
 
 @triton.jit
 def _rope_rotation_kernel(
@@ -56,7 +58,7 @@ def _rope_rotation_kernel(
 def _apply_rope_kernel(tensor, cos, sin, is_backward=False):
     batch_size, seq_len, num_heads, head_dim = tensor.shape
     output = torch.empty_like(tensor)
-    BLOCK_SIZE = triton.next_power_of_2(head_dim // 2)
+    BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(head_dim // 2)
     grid = (batch_size, seq_len, num_heads)
     _rope_rotation_kernel[grid](
         tensor,
@@ -77,6 +79,7 @@ def _apply_rope_kernel(tensor, cos, sin, is_backward=False):
         sin.stride(1),
         is_backward=is_backward,
         BLOCK_SIZE=BLOCK_SIZE,
+        num_warps=num_warps,
     )
     return output
 

@@ -2,6 +2,8 @@ import torch
 import triton
 import triton.language as tl
 
+from .utils import calculate_triton_kernel_configuration
+
 
 @triton.jit
 def relative_pos_bias_kernel(
@@ -57,7 +59,7 @@ class TritonRelativeFunction(torch.autograd.Function):
             device=embeddings.device,
             dtype=embeddings.dtype,
         )
-        BLOCK_SIZE_DIM = triton.next_power_of_2(head_dim)
+        BLOCK_SIZE_DIM, num_warps = calculate_triton_kernel_configuration(head_dim)
         grid = (batch_size, num_heads, seq_len)
         relative_pos_bias_kernel[grid](
             embeddings,
@@ -77,6 +79,7 @@ class TritonRelativeFunction(torch.autograd.Function):
             output.stride(3),
             output.stride(4),
             BLOCK_SIZE_DIM=BLOCK_SIZE_DIM,
+            num_warps=num_warps,
         )
         ctx.save_for_backward(positions)
         ctx.shape_info = (batch_size, num_heads, seq_len, head_dim, vocab_size)

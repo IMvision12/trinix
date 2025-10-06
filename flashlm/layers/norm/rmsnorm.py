@@ -15,7 +15,7 @@ class FastRMSNorm(nn.Module):
         self.hidden_size = hidden_size
         self.eps = eps
         self.use_triton = use_triton
-        
+
         self.weight = nn.Parameter(torch.ones(hidden_size))
 
     def _check_triton_availability(self) -> bool:
@@ -54,7 +54,7 @@ class FastRMSNorm(nn.Module):
                 f"Expected hidden_states with last dimension {self.hidden_size}, "
                 f"but got shape {hidden_states.shape}"
             )
-        
+
         if self._check_triton_availability():
             return self._triton_forward(hidden_states)
         else:
