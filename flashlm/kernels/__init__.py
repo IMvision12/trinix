@@ -14,6 +14,7 @@ if TRITON_AVAILABLE:
     from .relative_kernel import TritonRelativeKernel
     from .rmsnorm_kernel import TritonRMSNormKernel
     from .rope_kernel import TritonRoPEKernel
+    from .swigelu_kernel import TritonSwiGLUKernel
     from .utils import (
         calculate_triton_kernel_configuration,
         get_cuda_compute_capability,
@@ -26,6 +27,7 @@ if TRITON_AVAILABLE:
         "TritonLayerNormKernel",
         "TritonLayerNormFunction",
         "TritonRMSNormKernel",
+        "TritonSwiGLUKernel",
         "calculate_triton_kernel_configuration",
         "get_cuda_compute_capability",
     ]
@@ -56,10 +58,16 @@ else:
         def is_available():
             return False
 
+    class TritonSwiGLUKernel:
+        @staticmethod
+        def is_available():
+            return False
+
     __all__ = [
         "TritonRoPEKernel",
         "TritonALiBiKernel",
         "TritonRelativeKernel",
         "TritonLayerNormKernel",
         "TritonRMSNormKernel",
+        "TritonSwiGLUKernel",
     ]
