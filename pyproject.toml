@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastlayers"
+version = "0.1.0"
+description = "Fast PyTorch attention layers with Flash Attention and Triton kernel support"
+authors = [
+    { name = "Gitesh" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "flash-attn>=2.0.0",
+    "triton>=2.0.0",
+    "numpy",
+]
+
+[tool.setuptools]
+packages = ["fastlayers"]
