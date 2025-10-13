@@ -67,7 +67,6 @@ class FastBaseAttention(nn.Module):
             self.kernel_type = "pytorch"
         self.scale = self.head_dim ** (-0.5)
 
-        # Validate and setup position method
         self._validate_position_method(position_method)
         self.position_method = (
             position_method if isinstance(position_method, str) else "custom"
@@ -80,7 +79,6 @@ class FastBaseAttention(nn.Module):
             use_triton_embeddings,
         )
 
-        # Setup QK layer norm
         if qk_layer_norm:
             self.q_norm = nn.LayerNorm(self.head_dim, elementwise_affine=False)
             self.k_norm = nn.LayerNorm(self.head_dim, elementwise_affine=False)
@@ -326,8 +324,27 @@ class FastBaseAttention(nn.Module):
         v: torch.Tensor,
         attn_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        warnings.warn("Triton kernel not implemented yet, falling back to PyTorch")
-        return self._apply_pytorch_attention(q, k, v, attn_mask)
+        if not TRITON_AVAILABLE:
+            raise RuntimeError("Triton not available")
+
+        from ...kernels import TritonAttentionKernel
+
+        if not TritonAttentionKernel.is_available():
+            warnings.warn(
+                "Triton attention kernel not available, falling back to PyTorch"
+            )
+            return self._apply_pytorch_attention(q, k, v, attn_mask)
+
+        try:
+            out = TritonAttentionKernel.apply(
+                q, k, v, attn_mask, self.causal, self.scale
+            )
+            return out
+        except Exception as e:
+            warnings.warn(
+                f"Triton attention kernel failed: {e}, falling back to PyTorch"
+            )
+            return self._apply_pytorch_attention(q, k, v, attn_mask)
 
     def forward_attention(
         self,

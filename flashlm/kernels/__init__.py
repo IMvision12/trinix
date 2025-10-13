@@ -10,14 +10,17 @@ except ImportError:
 
 if TRITON_AVAILABLE:
     from .alibi_kernel import TritonALiBiKernel
+    from .attention_kernel import TritonAttentionKernel
     from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
     from .relative_kernel import TritonRelativeKernel
     from .rmsnorm_kernel import TritonRMSNormKernel
     from .rope_kernel import TritonRoPEKernel
     from .swigelu_kernel import TritonSwiGLUKernel
     from .utils import (
+        calculate_attention_block_sizes,
         calculate_triton_kernel_configuration,
         get_cuda_compute_capability,
+        get_gpu_shared_memory_limit,
     )
 
     __all__ = [
@@ -28,8 +31,11 @@ if TRITON_AVAILABLE:
         "TritonLayerNormFunction",
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
+        "TritonAttentionKernel",
         "calculate_triton_kernel_configuration",
+        "calculate_attention_block_sizes",
         "get_cuda_compute_capability",
+        "get_gpu_shared_memory_limit",
     ]
 else:
 
@@ -63,6 +69,11 @@ else:
         def is_available():
             return False
 
+    class TritonAttentionKernel:
+        @staticmethod
+        def is_available():
+            return False
+
     __all__ = [
         "TritonRoPEKernel",
         "TritonALiBiKernel",
@@ -70,4 +81,5 @@ else:
         "TritonLayerNormKernel",
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
+        "TritonAttentionKernel",
     ]
