@@ -119,6 +119,10 @@ class FastMultiQueryAttention(FastBaseAttention):
             v = torch.cat([past_v, v], dim=-2)
             seq_len_kv = k.shape[-2]
         
+        present_key_value = None
+        if use_cache:
+            present_key_value = (k, v)
+        
         k = k.expand(bs, self.num_heads, seq_len_kv, self.head_dim)
         v = v.expand(bs, self.num_heads, seq_len_kv, self.head_dim)
         
@@ -137,12 +141,6 @@ class FastMultiQueryAttention(FastBaseAttention):
         
         out = out.reshape(bs, seq_len_q, -1)
         out = self.o_proj(out)
-        
-        present_key_value = None
-        if use_cache:
-            k_cache = k.transpose(1, 2)[:, :1]
-            v_cache = v.transpose(1, 2)[:, :1]
-            present_key_value = (k_cache, v_cache)
         
         if use_cache:
             return (out, present_key_value)

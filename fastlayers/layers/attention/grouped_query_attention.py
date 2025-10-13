@@ -132,6 +132,10 @@ class FastGroupedQueryAttention(FastBaseAttention):
             v = torch.cat([past_v, v], dim=-2)
             seq_len = k.shape[-2]
 
+        present_key_value = None
+        if use_cache:
+            present_key_value = (k, v)
+
         k = self._tile_kv_heads(k, self.num_key_value_groups)
         v = self._tile_kv_heads(v, self.num_key_value_groups)
 
@@ -149,9 +153,5 @@ class FastGroupedQueryAttention(FastBaseAttention):
         out = self.forward_attention(q, k, v, attention_mask)
         out = out.reshape(bs, seq_len, -1)
         out = self.o_proj(out)
-        present_key_value = None
-        if use_cache:
-            k_cache = k.transpose(1, 2)[:, : self.num_kv_heads]
-            v_cache = v.transpose(1, 2)[:, : self.num_kv_heads]
-            present_key_value = (k_cache, v_cache)
+        
         return (out, present_key_value)
