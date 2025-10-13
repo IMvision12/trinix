@@ -5,6 +5,7 @@ from .attention import (
     FastGroupedQueryAttention,
     FastMultiHeadAttention,
     FastMultiHeadSelfAttention,
+    FastMultiHeadLatentAttention,
 )
 from .embeddings import (
     FastALiBiPositionEmbedding,
@@ -22,6 +23,7 @@ __all__ = [
     "FastGroupedQueryAttention",
     "FastMultiHeadAttention",
     "FastMultiHeadSelfAttention",
+    "FastMultiHeadLatentAttention",
     "FastRoPEPositionEmbedding",
     "FastALiBiPositionEmbedding",
     "FastRelativePositionEmbedding",

@@ -3,6 +3,7 @@ from .grouped_query_attention import FastGroupedQueryAttention
 from .multihead_attention import FastMultiHeadAttention
 from .multihead_self_attention import FastMultiHeadSelfAttention
 from .multi_query_attention import FastMultiQueryAttention
+from .multihead_latent_attention import FastMultiHeadLatentAttention
 
 __all__ = [
     "FastBaseAttention",
@@ -10,5 +11,6 @@ __all__ = [
     "FastMultiHeadAttention",
     "FastMultiHeadSelfAttention",
     "FastMultiQueryAttention",
+    "FastMultiHeadLatentAttention",
     "BaseCustomPositionEmbedding",
 ]
