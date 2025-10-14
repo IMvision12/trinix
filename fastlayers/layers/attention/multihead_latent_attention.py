@@ -24,12 +24,10 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         max_relative_position: int = 128,
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
-        qk_layer_norm: bool = False,
+        qk_rmsnorm: bool = False,
         use_triton_embeddings: bool = True,
         add_zero_attn: bool = False,
         batch_first: bool = True,
-        use_latent_norm: bool = False,
-        latent_norm_eps: float = 1e-6,
         use_triton_norm: bool = True,
     ):
         super().__init__(
@@ -45,31 +43,22 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
             max_relative_position,
             use_sliding_window,
             sliding_window_size,
-            qk_layer_norm,
+            qk_rmsnorm,
             use_triton_embeddings,
             add_zero_attn,
         )
 
         self.batch_first = batch_first
-        self.use_latent_norm = use_latent_norm
         self.latent_dim = (
             latent_dim if latent_dim is not None else max(16, embed_dim // 8)
         )
 
         self.q_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
-        if self.use_latent_norm:
-            self.q_latent_norm = FastRMSNorm(
-                self.latent_dim, eps=latent_norm_eps, use_triton=use_triton_norm
-            )
         self.q_up_proj = nn.Linear(
             self.latent_dim, num_heads * self.head_dim, bias=bias
         )
 
         self.kv_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
-        if self.use_latent_norm:
-            self.kv_latent_norm = FastRMSNorm(
-                self.latent_dim, eps=latent_norm_eps, use_triton=use_triton_norm
-            )
 
         self.k_up_proj = nn.Linear(
             self.latent_dim, num_heads * self.head_dim, bias=bias
@@ -79,6 +68,10 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         )
 
         self.o_proj = nn.Linear(num_heads * self.head_dim, embed_dim, bias=bias)
+
+        if self.qk_rmsnorm:
+            self.q_rmsnorm = FastRMSNorm(self.head_dim, use_triton=use_triton_norm)
+            self.k_rmsnorm = FastRMSNorm(self.head_dim, use_triton=use_triton_norm)
 
         self.register_buffer("cache_latent_kv", None, persistent=False)
         self.cache_position = 0
@@ -130,13 +123,9 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         _, seq_len_k, _ = key.shape
 
         q_latent = self.q_down_proj(query)
-        if self.use_latent_norm:
-            q_latent = self.q_latent_norm(q_latent)
         q = self.q_up_proj(q_latent)
 
         latent_new = self.kv_down_proj(key)
-        if self.use_latent_norm:
-            latent_new = self.kv_latent_norm(latent_new)
 
         if use_cache:
             if self.cache_latent_kv is None:
@@ -165,9 +154,9 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        if self.qk_layer_norm:
-            q = self.q_norm(q)
-            k = self.k_norm(k)
+        if self.qk_rmsnorm:
+            q = self.q_rmsnorm(q)
+            k = self.k_rmsnorm(k)
 
         k, v, attention_mask = self._add_zero_attention(k, v, attention_mask)
 
