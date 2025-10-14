@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import FastBaseAttention
-from ..norm import FastRMSNorm
 
 
 class FastMultiHeadLatentAttention(FastBaseAttention):
@@ -24,11 +23,12 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         max_relative_position: int = 128,
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
-        qk_rmsnorm: bool = False,
+        qk_norm: bool = False,
+        qk_norm_type: str = "rmsnorm",
+        use_triton_norm: bool = True,
         use_triton_embeddings: bool = True,
         add_zero_attn: bool = False,
         batch_first: bool = True,
-        use_triton_norm: bool = True,
     ):
         super().__init__(
             embed_dim,
@@ -43,7 +43,9 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
             max_relative_position,
             use_sliding_window,
             sliding_window_size,
-            qk_rmsnorm,
+            qk_norm,
+            qk_norm_type,
+            use_triton_norm,
             use_triton_embeddings,
             add_zero_attn,
         )
@@ -68,10 +70,6 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         )
 
         self.o_proj = nn.Linear(num_heads * self.head_dim, embed_dim, bias=bias)
-
-        if self.qk_rmsnorm:
-            self.q_rmsnorm = FastRMSNorm(self.head_dim, use_triton=use_triton_norm)
-            self.k_rmsnorm = FastRMSNorm(self.head_dim, use_triton=use_triton_norm)
 
         self.register_buffer("cache_latent_kv", None, persistent=False)
         self.cache_position = 0
@@ -154,9 +152,9 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        if self.qk_rmsnorm:
-            q = self.q_rmsnorm(q)
-            k = self.k_rmsnorm(k)
+        if self.qk_norm:
+            q = self.q_norm(q)
+            k = self.k_norm(k)
 
         k, v, attention_mask = self._add_zero_attention(k, v, attention_mask)
 

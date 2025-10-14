@@ -24,7 +24,9 @@ class FastGroupedQueryAttention(FastBaseAttention):
         max_relative_position: int = 128,
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
-        qk_layer_norm: bool = False,
+        qk_norm: bool = False,
+        qk_norm_type: str = "rmsnorm",
+        use_triton_norm: bool = True,
         use_triton_embeddings: bool = True,
     ):
         assert num_heads % num_kv_heads == 0, (
@@ -47,7 +49,9 @@ class FastGroupedQueryAttention(FastBaseAttention):
                 max_relative_position,
                 use_sliding_window,
                 sliding_window_size,
-                qk_layer_norm,
+                qk_norm,
+                qk_norm_type,
+                use_triton_norm,
                 use_triton_embeddings,
                 False,  # GQA doesn't use add_zero_attn
             )
@@ -66,7 +70,9 @@ class FastGroupedQueryAttention(FastBaseAttention):
                 max_relative_position,
                 use_sliding_window,
                 sliding_window_size,
-                qk_layer_norm,
+                qk_norm,
+                qk_norm_type,
+                use_triton_norm,
                 use_triton_embeddings,
                 False,  # GQA doesn't use add_zero_attn
             )
@@ -122,7 +128,7 @@ class FastGroupedQueryAttention(FastBaseAttention):
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        if self.qk_layer_norm:
+        if self.qk_norm:
             q = self.q_norm(q)
             k = self.k_norm(k)
 

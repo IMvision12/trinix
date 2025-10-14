@@ -5,6 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ..norm import FastLayerNorm, FastRMSNorm
+
 try:
     from flash_attn import flash_attn_func
 
@@ -36,7 +38,9 @@ class FastBaseAttention(nn.Module):
         max_relative_position: int = 128,
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
-        qk_layer_norm: bool = False,
+        qk_norm: bool = False,
+        qk_norm_type: str = "rmsnorm",
+        use_triton_norm: bool = True,
         use_triton_embeddings: bool = True,
         add_zero_attn: bool = False,
     ):
@@ -54,7 +58,8 @@ class FastBaseAttention(nn.Module):
         self.kernel_type = kernel_type
         self.use_sliding_window = use_sliding_window
         self.sliding_window_size = sliding_window_size
-        self.qk_layer_norm = qk_layer_norm
+        self.qk_norm = qk_norm
+        self.qk_norm_type = qk_norm_type
         self.add_zero_attn = add_zero_attn
         self.max_seq_len = max_seq_len
         self.scaling = self.head_dim ** (-0.5)
@@ -79,9 +84,17 @@ class FastBaseAttention(nn.Module):
             use_triton_embeddings,
         )
 
-        if qk_layer_norm:
-            self.q_norm = nn.LayerNorm(self.head_dim, elementwise_affine=False)
-            self.k_norm = nn.LayerNorm(self.head_dim, elementwise_affine=False)
+        if qk_norm:
+            if qk_norm_type == "rmsnorm":
+                self.q_norm = FastRMSNorm(self.head_dim, use_triton=use_triton_norm)
+                self.k_norm = FastRMSNorm(self.head_dim, use_triton=use_triton_norm)
+            elif qk_norm_type == "layernorm":
+                self.q_norm = FastLayerNorm(self.head_dim, use_triton=use_triton_norm)
+                self.k_norm = FastLayerNorm(self.head_dim, use_triton=use_triton_norm)
+            else:
+                raise ValueError(
+                    f"Invalid qk_norm_type: {qk_norm_type}. Use 'rmsnorm' or 'layernorm'"
+                )
         else:
             self.q_norm = None
             self.k_norm = None
