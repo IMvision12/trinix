@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .base import FastBaseAttention
+from ..norm import FastRMSNorm
 
 
 class FastMultiHeadLatentAttention(FastBaseAttention):
@@ -27,6 +28,9 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         use_triton_embeddings: bool = True,
         add_zero_attn: bool = False,
         batch_first: bool = True,
+        use_latent_norm: bool = False,
+        latent_norm_eps: float = 1e-6,
+        use_triton_norm: bool = True,
     ):
         super().__init__(
             embed_dim,
@@ -47,16 +51,25 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         )
 
         self.batch_first = batch_first
+        self.use_latent_norm = use_latent_norm
         self.latent_dim = (
             latent_dim if latent_dim is not None else max(16, embed_dim // 8)
         )
 
         self.q_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
+        if self.use_latent_norm:
+            self.q_latent_norm = FastRMSNorm(
+                self.latent_dim, eps=latent_norm_eps, use_triton=use_triton_norm
+            )
         self.q_up_proj = nn.Linear(
             self.latent_dim, num_heads * self.head_dim, bias=bias
         )
 
         self.kv_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
+        if self.use_latent_norm:
+            self.kv_latent_norm = FastRMSNorm(
+                self.latent_dim, eps=latent_norm_eps, use_triton=use_triton_norm
+            )
 
         self.k_up_proj = nn.Linear(
             self.latent_dim, num_heads * self.head_dim, bias=bias
@@ -73,14 +86,15 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         self._init_weights()
 
     def _init_weights(self):
-        for proj in [
+        projs = [
             self.q_down_proj,
             self.q_up_proj,
             self.kv_down_proj,
             self.k_up_proj,
             self.v_up_proj,
             self.o_proj,
-        ]:
+        ]
+        for proj in projs:
             nn.init.xavier_uniform_(proj.weight)
             if proj.bias is not None:
                 nn.init.constant_(proj.bias, 0.0)
@@ -116,9 +130,13 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         _, seq_len_k, _ = key.shape
 
         q_latent = self.q_down_proj(query)
+        if self.use_latent_norm:
+            q_latent = self.q_latent_norm(q_latent)
         q = self.q_up_proj(q_latent)
 
         latent_new = self.kv_down_proj(key)
+        if self.use_latent_norm:
+            latent_new = self.kv_latent_norm(latent_new)
 
         if use_cache:
             if self.cache_latent_kv is None:
