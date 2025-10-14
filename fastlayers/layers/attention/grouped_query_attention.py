@@ -153,5 +153,5 @@ class FastGroupedQueryAttention(FastBaseAttention):
         out = self.forward_attention(q, k, v, attention_mask)
         out = out.reshape(bs, seq_len, -1)
         out = self.o_proj(out)
-        
+
         return (out, present_key_value)

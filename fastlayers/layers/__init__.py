@@ -4,8 +4,8 @@ from .attention import (
     FastBaseAttention,
     FastGroupedQueryAttention,
     FastMultiHeadAttention,
-    FastMultiHeadSelfAttention,
     FastMultiHeadLatentAttention,
+    FastMultiHeadSelfAttention,
 )
 from .embeddings import (
     FastALiBiPositionEmbedding,

@@ -252,13 +252,13 @@ class FastBaseAttention(nn.Module):
     ) -> torch.Tensor:
         if not FLASH_ATTN_AVAILABLE:
             raise RuntimeError("Flash Attention not available")
-        
+
         if q.dtype not in [torch.float16, torch.bfloat16]:
             raise TypeError(
                 f"Flash Attention only supports fp16 and bf16 data types, got {q.dtype}. "
                 f"Please convert your model to fp16 or bf16: model.half() or model.to(torch.bfloat16)"
             )
-        
+
         batch_size, seq_len, num_heads, head_dim = q.shape
         out = flash_attn_func(
             q,

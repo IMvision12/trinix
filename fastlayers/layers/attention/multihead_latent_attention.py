@@ -45,38 +45,50 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
             use_triton_embeddings,
             add_zero_attn,
         )
-        
+
         self.batch_first = batch_first
-        self.latent_dim = latent_dim if latent_dim is not None else max(16, embed_dim // 8)
-        
-        # Query compression (DeepSeek-V3 style)
+        self.latent_dim = (
+            latent_dim if latent_dim is not None else max(16, embed_dim // 8)
+        )
+
         self.q_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
-        self.q_up_proj = nn.Linear(self.latent_dim, num_heads * self.head_dim, bias=bias)
-        
-        # KV compression (shared bottleneck)
+        self.q_up_proj = nn.Linear(
+            self.latent_dim, num_heads * self.head_dim, bias=bias
+        )
+
         self.kv_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
-        
-        self.k_up_proj = nn.Linear(self.latent_dim, num_heads * self.head_dim, bias=bias)
-        self.v_up_proj = nn.Linear(self.latent_dim, num_heads * self.head_dim, bias=bias)
-        
+
+        self.k_up_proj = nn.Linear(
+            self.latent_dim, num_heads * self.head_dim, bias=bias
+        )
+        self.v_up_proj = nn.Linear(
+            self.latent_dim, num_heads * self.head_dim, bias=bias
+        )
+
         self.o_proj = nn.Linear(num_heads * self.head_dim, embed_dim, bias=bias)
-        
+
         self.register_buffer("cache_latent_kv", None, persistent=False)
         self.cache_position = 0
-        
+
         self._init_weights()
-    
+
     def _init_weights(self):
-        for proj in [self.q_down_proj, self.q_up_proj, self.kv_down_proj, 
-                     self.k_up_proj, self.v_up_proj, self.o_proj]:
+        for proj in [
+            self.q_down_proj,
+            self.q_up_proj,
+            self.kv_down_proj,
+            self.k_up_proj,
+            self.v_up_proj,
+            self.o_proj,
+        ]:
             nn.init.xavier_uniform_(proj.weight)
             if proj.bias is not None:
                 nn.init.constant_(proj.bias, 0.0)
-    
+
     def reset_cache(self):
         self.cache_latent_kv = None
         self.cache_position = 0
-    
+
     def forward(
         self,
         query: torch.Tensor,
@@ -87,31 +99,27 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         position_ids: Optional[torch.Tensor] = None,
         use_cache: bool = False,
         **kwargs,
-    ) -> Union[
-        torch.Tensor, Tuple[torch.Tensor, Optional[torch.Tensor]]
-    ]:
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Optional[torch.Tensor]]]:
         if not self.batch_first:
             query = query.transpose(0, 1)
             if key is not None:
                 key = key.transpose(0, 1)
             if value is not None:
                 value = value.transpose(0, 1)
-        
+
         if key is None:
             key = query
         if value is None:
             value = key
-        
+
         bs, seq_len_q, _ = query.shape
         _, seq_len_k, _ = key.shape
-        
-        # Query compression (DeepSeek-V3 style)
+
         q_latent = self.q_down_proj(query)
         q = self.q_up_proj(q_latent)
-        
-        # KV compression
+
         latent_new = self.kv_down_proj(key)
-        
+
         if use_cache:
             if self.cache_latent_kv is None:
                 latent_total = latent_new
@@ -121,39 +129,39 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         else:
             latent_total = latent_new
             self.cache_position = 0
-        
+
         seq_len_latent = latent_total.shape[1]
-        
+
         k = self.k_up_proj(latent_total)
         v = self.v_up_proj(latent_total)
-        
+
         q = q.view(bs, seq_len_q, self.num_heads, self.head_dim)
         k = k.view(bs, seq_len_latent, self.num_heads, self.head_dim)
         v = v.view(bs, seq_len_latent, self.num_heads, self.head_dim)
-        
+
         q, k, position_bias = self._apply_position_embedding(
             q, k, seq_len_q, seq_len_latent, bs, position_ids
         )
-        
+
         q = q.transpose(1, 2)
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
-        
+
         if self.qk_layer_norm:
             q = self.q_norm(q)
             k = self.k_norm(k)
-        
+
         k, v, attention_mask = self._add_zero_attention(k, v, attention_mask)
-        
+
         q = q.transpose(1, 2)
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
-        
+
         if self.use_sliding_window:
             attention_mask = self._apply_sliding_window_mask(
                 attention_mask, seq_len_latent, query.device
             )
-        
+
         if self.causal and use_cache:
             q_positions = torch.arange(
                 self.cache_position,
@@ -161,28 +169,32 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
                 device=query.device,
                 dtype=torch.long,
             )
-            k_positions = torch.arange(seq_len_latent, device=query.device, dtype=torch.long)
+            k_positions = torch.arange(
+                seq_len_latent, device=query.device, dtype=torch.long
+            )
             causal_mask = q_positions.unsqueeze(-1) < k_positions.unsqueeze(0)
-            causal_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(bs, self.num_heads, -1, -1)
+            causal_mask = (
+                causal_mask.unsqueeze(0).unsqueeze(0).expand(bs, self.num_heads, -1, -1)
+            )
             causal_mask = causal_mask.float() * float("-inf")
-            
+
             if attention_mask is not None:
                 attention_mask = attention_mask + causal_mask
             else:
                 attention_mask = causal_mask
-            
+
             self.cache_position += seq_len_q
-        
+
         attention_mask = self._merge_position_bias(attention_mask, position_bias)
-        
+
         out = self.forward_attention(q, k, v, attention_mask)
-        
+
         out = out.reshape(bs, seq_len_q, -1)
         out = self.o_proj(out)
-        
+
         if not self.batch_first:
             out = out.transpose(0, 1)
-        
+
         if use_cache:
             return (out, self.cache_latent_kv)
         else:
