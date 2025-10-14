@@ -49,8 +49,11 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         self.batch_first = batch_first
         self.latent_dim = latent_dim if latent_dim is not None else max(16, embed_dim // 8)
         
-        self.q_proj = nn.Linear(embed_dim, num_heads * self.head_dim, bias=bias)
+        # Query compression (DeepSeek-V3 style)
+        self.q_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
+        self.q_up_proj = nn.Linear(self.latent_dim, num_heads * self.head_dim, bias=bias)
         
+        # KV compression (shared bottleneck)
         self.kv_down_proj = nn.Linear(embed_dim, self.latent_dim, bias=bias)
         
         self.k_up_proj = nn.Linear(self.latent_dim, num_heads * self.head_dim, bias=bias)
@@ -64,7 +67,8 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         self._init_weights()
     
     def _init_weights(self):
-        for proj in [self.q_proj, self.kv_down_proj, self.k_up_proj, self.v_up_proj, self.o_proj]:
+        for proj in [self.q_down_proj, self.q_up_proj, self.kv_down_proj, 
+                     self.k_up_proj, self.v_up_proj, self.o_proj]:
             nn.init.xavier_uniform_(proj.weight)
             if proj.bias is not None:
                 nn.init.constant_(proj.bias, 0.0)
@@ -101,8 +105,11 @@ class FastMultiHeadLatentAttention(FastBaseAttention):
         bs, seq_len_q, _ = query.shape
         _, seq_len_k, _ = key.shape
         
-        q = self.q_proj(query)
+        # Query compression (DeepSeek-V3 style)
+        q_latent = self.q_down_proj(query)
+        q = self.q_up_proj(q_latent)
         
+        # KV compression
         latent_new = self.kv_down_proj(key)
         
         if use_cache:
