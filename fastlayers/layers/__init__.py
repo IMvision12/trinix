@@ -1,5 +1,5 @@
 from . import activation, attention, embeddings, norm
-from .activation import FastSwiGLU
+from .activation import FastGeGLU, FastSwiGLU
 from .attention import (
     FastBaseAttention,
     FastGroupedQueryAttention,
@@ -12,6 +12,7 @@ from .embeddings import (
     FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
+
 from .norm import FastLayerNorm, FastRMSNorm
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "FastLayerNorm",
     "FastRMSNorm",
     "FastSwiGLU",
+    "FastGeGLU",
 ]

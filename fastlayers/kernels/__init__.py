@@ -11,6 +11,7 @@ except ImportError:
 if TRITON_AVAILABLE:
     from .alibi_kernel import TritonALiBiKernel
     from .attention_kernel import TritonAttentionKernel
+    from .geglu_kernel import TritonGeGLUKernel
     from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
     from .relative_kernel import TritonRelativeKernel
     from .rmsnorm_kernel import TritonRMSNormKernel
@@ -31,6 +32,7 @@ if TRITON_AVAILABLE:
         "TritonLayerNormFunction",
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
+        "TritonGeGLUKernel",
         "TritonAttentionKernel",
         "calculate_triton_kernel_configuration",
         "calculate_attention_block_sizes",
@@ -69,6 +71,11 @@ else:
         def is_available():
             return False
 
+    class TritonGeGLUKernel:
+        @staticmethod
+        def is_available():
+            return False
+
     class TritonAttentionKernel:
         @staticmethod
         def is_available():
@@ -81,5 +88,10 @@ else:
         "TritonLayerNormKernel",
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
+        "TritonGeGLUKernel",
+        "TritonGELUKernel",
+        "TritonSoftmaxKernel",
+        "TritonLinearLoRAKernel",
+        "TritonLinearQLoRAKernel",
         "TritonAttentionKernel",
     ]
