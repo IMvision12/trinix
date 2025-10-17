@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fastlayers"
+name = "trinix"
 version = "0.1.0"
-description = "Fast PyTorch attention layers with Flash Attention and Triton kernel support"
+description = "High-performance PyTorch layers with optimized Triton kernels and Flash Attention support"
 authors = [
     { name = "Gitesh" }
 ]
@@ -30,4 +30,4 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["fastlayers"]
+packages = ["trinix"]
