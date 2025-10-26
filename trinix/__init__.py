@@ -1,4 +1,4 @@
-from . import kernels, layers, optimizers
+from . import kernels, layers, optim
 from .kernels import (
     TritonAdamWKernel,
     TritonALiBiKernel,
@@ -32,13 +32,13 @@ from .layers.embeddings import (
     FastRoPEPositionEmbedding,
 )
 from .layers.norm import FastLayerNorm, FastRMSNorm
-from .optimizers import FastAdamW
+from .optim import FastAdamW
 
 __version__ = "0.1.0"
 __all__ = [
     "layers",
     "kernels",
-    "optimizers",
+    "optim",
     "FastBaseAttention",
     "FastGroupedQueryAttention",
     "FastMultiHeadAttention",
