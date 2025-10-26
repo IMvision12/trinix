@@ -12,7 +12,6 @@ from .embeddings import (
     FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
-
 from .norm import FastLayerNorm, FastRMSNorm
 
 __all__ = [

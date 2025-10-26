@@ -9,6 +9,7 @@ except ImportError:
     warnings.warn("Triton not available. Triton kernels will not be available.")
 
 if TRITON_AVAILABLE:
+    from .adamw_kernel import TritonAdamWKernel
     from .alibi_kernel import TritonALiBiKernel
     from .attention_kernel import TritonAttentionKernel
     from .geglu_kernel import TritonGeGLUKernel
@@ -25,6 +26,7 @@ if TRITON_AVAILABLE:
     )
 
     __all__ = [
+        "TritonAdamWKernel",
         "TritonRoPEKernel",
         "TritonALiBiKernel",
         "TritonRelativeKernel",
@@ -40,6 +42,11 @@ if TRITON_AVAILABLE:
         "get_gpu_shared_memory_limit",
     ]
 else:
+
+    class TritonAdamWKernel:
+        @staticmethod
+        def is_available():
+            return False
 
     class TritonALiBiKernel:
         @staticmethod
@@ -82,6 +89,7 @@ else:
             return False
 
     __all__ = [
+        "TritonAdamWKernel",
         "TritonRoPEKernel",
         "TritonALiBiKernel",
         "TritonRelativeKernel",
