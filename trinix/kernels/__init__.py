@@ -97,9 +97,5 @@ else:
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
         "TritonGeGLUKernel",
-        "TritonGELUKernel",
-        "TritonSoftmaxKernel",
-        "TritonLinearLoRAKernel",
-        "TritonLinearQLoRAKernel",
         "TritonAttentionKernel",
     ]

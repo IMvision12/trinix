@@ -62,7 +62,7 @@ class FastBaseAttention(nn.Module):
         self.qk_norm_type = qk_norm_type
         self.add_zero_attn = add_zero_attn
         self.max_seq_len = max_seq_len
-        self.scaling = self.head_dim ** (-0.5)
+        self.scale = self.head_dim ** (-0.5)
 
         if kernel_type == "flash" and (not FLASH_ATTN_AVAILABLE):
             warnings.warn("Flash Attention not available, falling back to PyTorch")
@@ -70,7 +70,6 @@ class FastBaseAttention(nn.Module):
         elif kernel_type == "triton" and (not TRITON_AVAILABLE):
             warnings.warn("Triton not available, falling back to PyTorch")
             self.kernel_type = "pytorch"
-        self.scale = self.head_dim ** (-0.5)
 
         self._validate_position_method(position_method)
         self.position_method = (
@@ -356,8 +355,24 @@ class FastBaseAttention(nn.Module):
             return self._apply_pytorch_attention(q, k, v, attn_mask)
 
         try:
+            alibi_slopes = None
+            if self.position_method == "alibi" and self.position_embedding is not None:
+                alibi_slopes = self.position_embedding.slopes
+
+            window_size = None
+            if self.use_sliding_window and self.sliding_window_size is not None:
+                window_size = (self.sliding_window_size, self.sliding_window_size)
+
             out = TritonAttentionKernel.apply(
-                q, k, v, attn_mask, self.causal, self.scale
+                q,
+                k,
+                v,
+                attn_mask=attn_mask,
+                causal=self.causal,
+                scale=self.scale,
+                dropout_p=self.dropout if self.training else 0.0,
+                window_size=window_size,
+                alibi_slopes=alibi_slopes,
             )
             return out
         except Exception as e:

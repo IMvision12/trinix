@@ -1,4 +1,8 @@
 from .base import FastBaseAttention
+from .functional import (
+    triton_attn_func,
+    triton_attention,
+)
 from .grouped_query_attention import FastGroupedQueryAttention
 from .multi_query_attention import FastMultiQueryAttention
 from .multihead_attention import FastMultiHeadAttention
@@ -13,4 +17,6 @@ __all__ = [
     "FastMultiQueryAttention",
     "FastMultiHeadLatentAttention",
     "BaseCustomPositionEmbedding",
+    "triton_attn_func",
+    "triton_attention",
 ]

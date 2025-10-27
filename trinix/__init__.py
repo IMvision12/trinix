@@ -25,12 +25,15 @@ from .layers.attention import (
     FastGroupedQueryAttention,
     FastMultiHeadAttention,
     FastMultiHeadSelfAttention,
+    triton_attn_func,
+    triton_attention,
 )
 from .layers.embeddings import (
     FastALiBiPositionEmbedding,
     FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
+
 from .layers.norm import FastLayerNorm, FastRMSNorm
 from .optim import FastAdamW
 
@@ -59,6 +62,8 @@ __all__ = [
     "TritonRMSNormKernel",
     "TritonSwiGLUKernel",
     "TritonGeGLUKernel",
+    "triton_attn_func",
+    "triton_attention",
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
 ]
