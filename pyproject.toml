@@ -1,17 +1,18 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools==80.9.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "trinix"
-version = "0.1.0"
+dynamic = ["version"]
 description = "High-performance PyTorch layers with optimized Triton kernels and Flash Attention support"
 authors = [
     { name = "Gitesh" }
 ]
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
+requires-python = ">=3.9,<3.14"
+license = "Apache-2.0"
+keywords = ["triton", "flash attention", "pytorch", "llm", "machine learning", "deep learning"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -31,3 +32,7 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["trinix"]
+
+[project.urls]
+documentation = "https://github.com/IMvision12/trinix"
+repository = "https://github.com/IMvision12/trinix"
