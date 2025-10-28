@@ -2,6 +2,8 @@ import torch
 import triton
 import triton.language as tl
 
+from .utils import calculate_triton_kernel_configuration
+
 
 @triton.jit
 def fused_adamw_kernel(
@@ -121,7 +123,7 @@ class TritonAdamWKernel:
         bias_correction1 = 1.0 - beta1**step
         bias_correction2 = 1.0 - beta2**step
 
-        BLOCK_SIZE = 1024
+        BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(n_elements)
 
         grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
 
@@ -142,6 +144,7 @@ class TritonAdamWKernel:
                 grad_scale,
                 n_elements,
                 BLOCK_SIZE=BLOCK_SIZE,
+                num_warps=num_warps,
             )
         else:
             fused_adamw_kernel[grid](
@@ -159,4 +162,5 @@ class TritonAdamWKernel:
                 bias_correction2,
                 n_elements,
                 BLOCK_SIZE=BLOCK_SIZE,
+                num_warps=num_warps,
             )
