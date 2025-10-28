@@ -26,7 +26,6 @@ from .layers.attention import (
     FastMultiHeadAttention,
     FastMultiHeadSelfAttention,
     triton_attn_func,
-    triton_attention,
 )
 from .layers.embeddings import (
     FastALiBiPositionEmbedding,
@@ -63,7 +62,6 @@ __all__ = [
     "TritonSwiGLUKernel",
     "TritonGeGLUKernel",
     "triton_attn_func",
-    "triton_attention",
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
 ]
