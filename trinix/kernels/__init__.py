@@ -14,6 +14,7 @@ if TRITON_AVAILABLE:
     from .attention_kernel import TritonAttentionKernel
     from .geglu_kernel import TritonGeGLUKernel
     from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
+    from .quickgelu_kernel import TritonQuickGELUKernel
     from .reglu_kernel import TritonReGLUKernel
     from .relative_kernel import TritonRelativeKernel
     from .rmsnorm_kernel import TritonRMSNormKernel
@@ -36,6 +37,7 @@ if TRITON_AVAILABLE:
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
         "TritonGeGLUKernel",
+        "TritonQuickGELUKernel",
         "TritonReGLUKernel",
         "TritonAttentionKernel",
         "calculate_triton_kernel_configuration",
@@ -85,6 +87,11 @@ else:
         def is_available():
             return False
 
+    class TritonQuickGELUKernel:
+        @staticmethod
+        def is_available():
+            return False
+
     class TritonReGLUKernel:
         @staticmethod
         def is_available():
@@ -104,6 +111,7 @@ else:
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",
         "TritonGeGLUKernel",
+        "TritonQuickGELUKernel",
         "TritonReGLUKernel",
         "TritonAttentionKernel",
     ]
