@@ -14,6 +14,7 @@ if TRITON_AVAILABLE:
     from .attention_kernel import TritonAttentionKernel
     from .geglu_kernel import TritonGeGLUKernel
     from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
+    from .mish_kernel import TritonMishKernel
     from .quickgelu_kernel import TritonQuickGELUKernel
     from .reglu_kernel import TritonReGLUKernel
     from .relative_kernel import TritonRelativeKernel
@@ -41,6 +42,7 @@ if TRITON_AVAILABLE:
         "TritonQuickGELUKernel",
         "TritonReGLUKernel",
         "TritonSquaredReLUKernel",
+        "TritonMishKernel",
         "TritonAttentionKernel",
         "calculate_triton_kernel_configuration",
         "calculate_attention_block_sizes",
@@ -104,6 +106,11 @@ else:
         def is_available():
             return False
 
+    class TritonMishKernel:
+        @staticmethod
+        def is_available():
+            return False
+
     class TritonAttentionKernel:
         @staticmethod
         def is_available():
@@ -121,5 +128,6 @@ else:
         "TritonQuickGELUKernel",
         "TritonReGLUKernel",
         "TritonSquaredReLUKernel",
+        "TritonMishKernel",
         "TritonAttentionKernel",
     ]

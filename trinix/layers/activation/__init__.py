@@ -1,7 +1,8 @@
 from .geglu import FastGeGLU
+from .mish import FastMish
 from .quickgelu import FastQuickGELU
 from .reglu import FastReGLU
 from .squared_relu import FastSquaredReLU
 from .swigelu import FastSwiGLU
 
-__all__ = ["FastSwiGLU", "FastGeGLU", "FastQuickGELU", "FastReGLU", "FastSquaredReLU"]
+__all__ = ["FastSwiGLU", "FastGeGLU", "FastQuickGELU", "FastReGLU", "FastSquaredReLU", "FastMish"]
