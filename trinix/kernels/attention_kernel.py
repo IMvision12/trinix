@@ -197,7 +197,6 @@ def _prepare_mask(attn_mask, batch_size, num_heads, seq_len, device):
 
 
 class TritonAttentionKernel:
-
     @staticmethod
     def is_available() -> bool:
         try:

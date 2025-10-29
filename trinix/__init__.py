@@ -32,7 +32,6 @@ from .layers.embeddings import (
     FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
-
 from .layers.norm import FastLayerNorm, FastRMSNorm
 from .optim import FastAdamW
 

@@ -41,16 +41,16 @@ def mish_backward_kernel(
     x = tl.load(X_ptr + offsets, mask=mask, other=0.0)
     dY_f32 = dY.to(tl.float32)
     x_f32 = x.to(tl.float32)
-    
+
     exp_x = tl.exp(x_f32)
     softplus = tl.log(1.0 + exp_x)
     exp_2softplus = tl.exp(2.0 * softplus)
     tanh_softplus = (exp_2softplus - 1.0) / (exp_2softplus + 1.0)
     sech2_softplus = 1.0 - tanh_softplus * tanh_softplus
-    
+
     sigmoid_x = exp_x / (1.0 + exp_x)
     dX = dY_f32 * (tanh_softplus + x_f32 * sech2_softplus * sigmoid_x)
-    
+
     tl.store(dX_ptr + offsets, dX.to(x.dtype), mask=mask)
 
 
