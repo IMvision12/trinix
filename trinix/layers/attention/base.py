@@ -346,13 +346,7 @@ class FastBaseAttention(nn.Module):
         if not TRITON_AVAILABLE:
             raise RuntimeError("Triton not available")
 
-        from ...kernels import TritonAttentionKernel
-
-        if not TritonAttentionKernel.is_available():
-            warnings.warn(
-                "Triton attention kernel not available, falling back to PyTorch"
-            )
-            return self._apply_pytorch_attention(q, k, v, attn_mask)
+        from .functional import triton_attn_func
 
         try:
             alibi_slopes = None
@@ -363,14 +357,14 @@ class FastBaseAttention(nn.Module):
             if self.use_sliding_window and self.sliding_window_size is not None:
                 window_size = (self.sliding_window_size, self.sliding_window_size)
 
-            out = TritonAttentionKernel.apply(
+            out = triton_attn_func(
                 q,
                 k,
                 v,
                 attn_mask=attn_mask,
-                causal=self.causal,
-                scale=self.scale,
                 dropout_p=self.dropout if self.training else 0.0,
+                softmax_scale=self.scale,
+                causal=self.causal,
                 window_size=window_size,
                 alibi_slopes=alibi_slopes,
             )
