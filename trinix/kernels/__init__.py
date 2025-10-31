@@ -10,6 +10,7 @@ except ImportError:
 
 if TRITON_AVAILABLE:
     from .adamw_kernel import TritonAdamWKernel
+    from .lion_kernel import TritonLionKernel
     from .alibi_kernel import TritonALiBiKernel
     from .attention_kernel import TritonAttentionKernel
     from .geglu_kernel import TritonGeGLUKernel
@@ -31,6 +32,7 @@ if TRITON_AVAILABLE:
 
     __all__ = [
         "TritonAdamWKernel",
+        "TritonLionKernel",
         "TritonRoPEKernel",
         "TritonALiBiKernel",
         "TritonRelativeKernel",
@@ -52,6 +54,11 @@ if TRITON_AVAILABLE:
 else:
 
     class TritonAdamWKernel:
+        @staticmethod
+        def is_available():
+            return False
+
+    class TritonLionKernel:
         @staticmethod
         def is_available():
             return False
@@ -118,6 +125,7 @@ else:
 
     __all__ = [
         "TritonAdamWKernel",
+        "TritonLionKernel",
         "TritonRoPEKernel",
         "TritonALiBiKernel",
         "TritonRelativeKernel",
