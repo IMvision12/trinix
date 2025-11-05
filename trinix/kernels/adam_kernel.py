@@ -38,9 +38,9 @@ def fused_adam_kernel(
     one_minus_beta2 = 1.0 - beta2
 
     exp_avg = tl.fma(beta1, exp_avg, one_minus_beta1 * grads)
-    
+
     exp_avg_sq = tl.fma(beta2, exp_avg_sq, one_minus_beta2 * grads * grads)
-    
+
     exp_avg_corrected = exp_avg / bias_correction1
     exp_avg_sq_corrected = exp_avg_sq / bias_correction2
 
@@ -82,16 +82,16 @@ def fused_adam_kernel_with_grad_scale(
     exp_avg_sq = tl.load(exp_avg_sq_ptr + offsets, mask=mask, other=0.0)
 
     grads = grads / grad_scale
-    
+
     grads = tl.where(weight_decay != 0.0, grads + weight_decay * params, grads)
 
     one_minus_beta1 = 1.0 - beta1
     one_minus_beta2 = 1.0 - beta2
 
     exp_avg = tl.fma(beta1, exp_avg, one_minus_beta1 * grads)
-    
+
     exp_avg_sq = tl.fma(beta2, exp_avg_sq, one_minus_beta2 * grads * grads)
-    
+
     exp_avg_corrected = exp_avg / bias_correction1
     exp_avg_sq_corrected = exp_avg_sq / bias_correction2
 

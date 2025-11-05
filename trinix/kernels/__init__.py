@@ -10,11 +10,11 @@ except ImportError:
 
 if TRITON_AVAILABLE:
     from .adamw_kernel import TritonAdamWKernel
-    from .lion_kernel import TritonLionKernel
     from .alibi_kernel import TritonALiBiKernel
     from .attention_kernel import TritonAttentionKernel
     from .geglu_kernel import TritonGeGLUKernel
     from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
+    from .lion_kernel import TritonLionKernel
     from .mish_kernel import TritonMishKernel
     from .quickgelu_kernel import TritonQuickGELUKernel
     from .reglu_kernel import TritonReGLUKernel

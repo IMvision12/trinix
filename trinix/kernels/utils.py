@@ -43,10 +43,10 @@ def get_gpu_shared_memory_limit():
         return 48 * 1024
 
     device_properties = torch.cuda.get_device_properties(0)
-    
-    if hasattr(device_properties, 'shared_memory_per_block'):
+
+    if hasattr(device_properties, "shared_memory_per_block"):
         return device_properties.shared_memory_per_block
-    elif hasattr(device_properties, 'max_shared_memory_per_block_optin'):
+    elif hasattr(device_properties, "max_shared_memory_per_block_optin"):
         return device_properties.max_shared_memory_per_block_optin
     else:
         compute_capability = device_properties.major * 10 + device_properties.minor
