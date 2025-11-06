@@ -7,6 +7,33 @@ from ..kernels.adamw_kernel import TritonAdamWKernel
 
 
 class FastAdamW(Optimizer):
+    """Fast AdamW optimizer with automatic Triton/PyTorch backend selection.
+
+    Implements AdamW algorithm with decoupled weight decay. Unlike Adam, AdamW applies
+    weight decay directly to parameters before the gradient update, which has been shown
+    to improve generalization. Automatically uses Triton kernels for CUDA tensors when
+    available, falling back to PyTorch implementation otherwise.
+
+    Args:
+        params (iterable): Iterable of parameters to optimize or dicts defining parameter groups.
+        lr (float, optional): Learning rate. Defaults to 1e-3.
+        betas (Tuple[float, float], optional): Coefficients for computing running averages
+            of gradient and its square. Defaults to (0.9, 0.999).
+        eps (float, optional): Term added to denominator for numerical stability. Defaults to 1e-8.
+        weight_decay (float, optional): Decoupled weight decay coefficient. Defaults to 1e-2.
+        use_triton (bool, optional): Whether to enable Triton kernels for CUDA tensors.
+            Defaults to True.
+
+    Examples:
+        >>> optimizer = FastAdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
+        >>> optimizer.zero_grad()
+        >>> loss.backward()
+        >>> optimizer.step()
+
+        >>> # AdamW is commonly used for training transformers
+        >>> optimizer = FastAdamW(model.parameters(), lr=5e-5, weight_decay=0.01)
+    """
+
     def __init__(
         self,
         params: Union[Iterable[torch.Tensor], Iterable[dict]],

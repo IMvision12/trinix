@@ -7,6 +7,34 @@ from ..kernels.adam_kernel import TritonAdamKernel
 
 
 class FastAdam(Optimizer):
+    """Fast Adam optimizer with automatic Triton/PyTorch backend selection.
+
+    Implements Adam algorithm with adaptive learning rates. Automatically uses Triton kernels
+    for CUDA tensors when available, falling back to PyTorch implementation otherwise.
+    Adam maintains exponential moving averages of both gradients (first moment) and
+    squared gradients (second moment) with bias correction.
+
+    Args:
+        params (iterable): Iterable of parameters to optimize or dicts defining parameter groups.
+        lr (float, optional): Learning rate. Defaults to 1e-3.
+        betas (Tuple[float, float], optional): Coefficients for computing running averages
+            of gradient and its square. Defaults to (0.9, 0.999).
+        eps (float, optional): Term added to denominator for numerical stability. Defaults to 1e-8.
+        weight_decay (float, optional): Weight decay (L2 penalty) coefficient. Defaults to 0.0.
+        use_triton (bool, optional): Whether to enable Triton kernels for CUDA tensors.
+            Defaults to True.
+
+    Examples:
+        >>> optimizer = FastAdam(model.parameters(), lr=1e-3)
+        >>> optimizer.zero_grad()
+        >>> loss.backward()
+        >>> optimizer.step()
+
+        >>> # With mixed precision training
+        >>> scaler = torch.cuda.amp.GradScaler()
+        >>> optimizer.step(grad_scaler=scaler.get_scale())
+    """
+
     def __init__(
         self,
         params: Union[Iterable[torch.Tensor], Iterable[dict]],

@@ -25,6 +25,30 @@ def relative_pos_bias_kernel(
     stride_out_dim,
     BLOCK_SIZE_DIM: tl.constexpr,
 ):
+    """Relative position bias kernel.
+
+    Computes position-dependent bias embeddings for attention mechanisms using learned
+    relative position embeddings indexed by position differences.
+
+    Args:
+        embeddings_ptr: Pointer to position embedding table.
+        positions_ptr: Pointer to position indices tensor.
+        output_ptr: Pointer to output bias tensor.
+        batch_size: Number of sequences in the batch.
+        num_heads: Number of attention heads.
+        seq_len: Sequence length.
+        head_dim: Dimension of each attention head.
+        stride_emb_vocab: Stride for vocabulary dimension in embeddings.
+        stride_emb_dim: Stride for dimension in embeddings.
+        stride_pos_i: Stride for query position dimension in positions.
+        stride_pos_j: Stride for key position dimension in positions.
+        stride_out_batch: Stride for batch dimension in output.
+        stride_out_head: Stride for head dimension in output.
+        stride_out_i: Stride for query position dimension in output.
+        stride_out_j: Stride for key position dimension in output.
+        stride_out_dim: Stride for embedding dimension in output.
+        BLOCK_SIZE_DIM: Triton block size for embedding dimension.
+    """
     batch_idx = tl.program_id(0)
     head_idx = tl.program_id(1)
     i_idx = tl.program_id(2)
@@ -46,6 +70,36 @@ def relative_pos_bias_kernel(
 
 
 class TritonRelativeFunction(torch.autograd.Function):
+    """Autograd function for relative position bias computation.
+
+    This function wraps the relative position bias kernel for automatic differentiation.
+
+    Methods:
+        forward(ctx, embeddings, positions, batch_size, num_heads):
+            Computes position-dependent bias embeddings using learned relative position embeddings.
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                embeddings (torch.Tensor): Position embedding table of shape (vocab_size, head_dim).
+                positions (torch.Tensor): Position indices tensor of shape (seq_len, seq_len).
+                batch_size (int): Number of sequences in the batch.
+                num_heads (int): Number of attention heads.
+
+            Returns:
+                torch.Tensor: Bias tensor of shape (batch_size, num_heads, seq_len, seq_len, head_dim).
+
+        backward(ctx, grad_output):
+            Backward pass for relative position bias.
+
+            Parameters:
+                ctx: Autograd context containing saved position indices.
+                grad_output: Gradient of loss with respect to the output.
+
+            Returns:
+                tuple: (grad_embeddings, None, None, None) - Gradient for embeddings only,
+                    None for positions, batch_size, and num_heads.
+    """
+
     @staticmethod
     def forward(ctx, embeddings, positions, batch_size, num_heads):
         seq_len, _ = positions.shape
@@ -102,6 +156,32 @@ class TritonRelativeFunction(torch.autograd.Function):
 
 
 class TritonRelativeKernel:
+    """Triton-accelerated relative position bias kernel wrapper.
+
+    Provides a high-level interface for computing position-dependent attention biases
+    using learned relative position embeddings.
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(embeddings, positions, batch_size, num_heads):
+            Computes relative position bias embeddings for attention mechanisms.
+
+            Parameters:
+                embeddings (torch.Tensor): Position embedding table of shape (vocab_size, head_dim)
+                    containing learned embeddings for relative position differences.
+                positions (torch.Tensor): Position indices tensor of shape (seq_len, seq_len)
+                    where positions[i, j] contains the index into the embedding table for
+                    the relative position between query position i and key position j.
+                batch_size (int): Number of sequences in the batch.
+                num_heads (int): Number of attention heads.
+
+            Returns:
+                torch.Tensor: Bias tensor of shape (batch_size, num_heads, seq_len, seq_len, head_dim)
+                    containing position-dependent bias embeddings that can be added to attention scores.
+    """
+
     @staticmethod
     def apply(
         embeddings: torch.Tensor,

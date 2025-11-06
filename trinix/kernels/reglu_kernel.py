@@ -14,6 +14,18 @@ def reglu_forward_kernel(
     n_cols: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """ReGLU (Gated ReLU) forward kernel.
+
+    Computes ReGLU activation: x1 * ReLU(x2), where the input is split into two halves.
+
+    Args:
+        Y_ptr: Pointer to output tensor.
+        Y_row_stride: Stride for row dimension in output tensor.
+        X_ptr: Pointer to input tensor (last dimension must be even).
+        X_row_stride: Stride for row dimension in input tensor.
+        n_cols: Number of columns (half of input dimension).
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -39,6 +51,20 @@ def reglu_backward_kernel(
     n_cols: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """ReGLU backward kernel.
+
+    Computes gradients for ReGLU activation with respect to both input halves.
+
+    Args:
+        dY_ptr: Pointer to output gradient tensor.
+        dY_row_stride: Stride for row dimension in output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        X_row_stride: Stride for row dimension in input tensor.
+        dX_ptr: Pointer to input gradient tensor.
+        dX_row_stride: Stride for row dimension in input gradient tensor.
+        n_cols: Number of columns (half of input dimension).
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -60,6 +86,32 @@ def reglu_backward_kernel(
 
 
 class TritonReGLUFunction(torch.autograd.Function):
+    """Autograd function for ReGLU activation.
+
+    This function wraps the ReGLU kernel for automatic differentiation.
+
+    Methods:
+        forward(ctx, X):
+            Computes ReGLU activation: x1 * ReLU(x2) where input is split in half.
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                X (torch.Tensor): Input tensor with even last dimension.
+
+            Returns:
+                torch.Tensor: Output tensor with last dimension halved.
+
+        backward(ctx, dY):
+            Backward pass for ReGLU activation.
+
+            Parameters:
+                ctx: Autograd context containing saved input tensor.
+                dY: Gradient of loss with respect to the output.
+
+            Returns:
+                torch.Tensor: Gradient of loss with respect to the input.
+    """
+
     @staticmethod
     def forward(ctx, X):
         shape = X.shape
@@ -113,6 +165,27 @@ class TritonReGLUFunction(torch.autograd.Function):
 
 
 class TritonReGLUKernel:
+    """Triton-accelerated ReGLU (Gated ReLU) activation kernel wrapper.
+
+    Provides a high-level interface for applying ReGLU activation: x1 * ReLU(x2),
+    where the input is split into two halves along the last dimension.
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(X):
+            Applies ReGLU activation to the input tensor.
+
+            Parameters:
+                X (torch.Tensor): Input tensor with even last dimension. The tensor is split
+                    into two halves along the last dimension: x1 and x2.
+
+            Returns:
+                torch.Tensor: Output tensor with last dimension halved, computed as x1 * ReLU(x2).
+                    ReLU is applied to the second half before element-wise multiplication with the first half.
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:

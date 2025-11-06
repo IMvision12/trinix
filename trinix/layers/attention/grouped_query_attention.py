@@ -8,6 +8,54 @@ from .base import FastBaseAttention
 
 
 class FastGroupedQueryAttention(FastBaseAttention):
+    """Fast Grouped Query Attention (GQA) layer.
+
+    GQA is a memory-efficient variant where multiple query heads share the same key-value heads.
+    This reduces the KV cache size while maintaining most of the performance of standard MHA.
+    Used in modern LLMs like LLaMA 2, Mistral, and others for efficient inference.
+
+    Args:
+        embed_dim (int): Total dimension of the model.
+        num_heads (int): Number of query heads (must be divisible by num_kv_heads).
+        num_kv_heads (int): Number of key-value heads. Each KV head is shared by
+            num_heads // num_kv_heads query heads.
+        dropout (float, optional): Dropout probability. Defaults to 0.0.
+        bias (bool, optional): Whether to use bias in projections. Defaults to True.
+        kernel_type (str, optional): Attention backend ('flash', 'triton', 'pytorch'). Defaults to 'flash'.
+        causal (bool, optional): Whether to apply causal masking. Defaults to False.
+        head_dim (int, optional): Dimension per head. If None, uses embed_dim // num_heads. Defaults to None.
+        position_method (str or nn.Module, optional): Position encoding method. Defaults to 'none'.
+        max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
+        rope_base (float, optional): Base for RoPE frequencies. Defaults to 10000.0.
+        max_relative_position (int, optional): Max relative position for relative embeddings. Defaults to 128.
+        use_sliding_window (bool, optional): Enable sliding window attention. Defaults to False.
+        sliding_window_size (int, optional): Sliding window size. Defaults to None.
+        qk_norm (bool, optional): Normalize queries and keys. Defaults to False.
+        qk_norm_type (str, optional): Normalization type ('rmsnorm' or 'layernorm'). Defaults to 'rmsnorm'.
+        use_triton_norm (bool, optional): Use Triton for normalization. Defaults to True.
+        use_triton_embeddings (bool, optional): Use Triton for position embeddings. Defaults to True.
+
+    Examples:
+        >>> # GQA with 32 query heads and 8 KV heads (4x reduction in KV cache)
+        >>> attn = FastGroupedQueryAttention(
+        ...     embed_dim=4096, num_heads=32, num_kv_heads=8
+        ... )
+        >>> x = torch.randn(4, 128, 4096)
+        >>> output, kv_cache = attn(x, use_cache=True)
+
+        >>> # LLaMA 2 style GQA with RoPE
+        >>> attn = FastGroupedQueryAttention(
+        ...     embed_dim=4096, num_heads=32, num_kv_heads=8,
+        ...     causal=True, position_method='rope'
+        ... )
+
+    Notes:
+        - num_heads must be divisible by num_kv_heads
+        - When num_kv_heads = num_heads, this is equivalent to standard MHA
+        - When num_kv_heads = 1, this is equivalent to Multi-Query Attention (MQA)
+        - Reduces KV cache size by factor of (num_heads / num_kv_heads)
+    """
+
     def __init__(
         self,
         embed_dim: int,

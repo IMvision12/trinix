@@ -13,6 +13,27 @@ except (ImportError, ModuleNotFoundError):
 
 
 class FastALiBiPositionEmbedding(nn.Module):
+    """Fast ALiBi (Attention with Linear Biases) position embedding layer.
+
+    ALiBi adds position-dependent biases to attention scores based on the distance between
+    query and key positions. Uses learned per-head slopes to scale the distance penalty.
+    Automatically uses Triton kernels when available, falling back to PyTorch implementation.
+
+    Args:
+        num_heads (int): Number of attention heads.
+        max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
+        use_triton (bool, optional): Whether to enable Triton kernels. Defaults to True.
+
+    Shape:
+        - Output: (batch_size, num_heads, seq_len, seq_len) containing bias values
+          where bias[b, h, i, j] = -slopes[h] * |i - j|
+
+    Examples:
+        >>> alibi = FastALiBiPositionEmbedding(num_heads=8)
+        >>> bias = alibi(seq_len=128, batch_size=4)  # shape: (4, 8, 128, 128)
+        >>> # Add to attention scores: scores = scores + bias
+    """
+
     def __init__(
         self, num_heads: int, max_seq_len: int = 2048, use_triton: bool = True
     ):

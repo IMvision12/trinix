@@ -56,6 +56,40 @@ def _fwd_kernel_with_mask(
     BLOCK_N: tl.constexpr,
     BLOCK_DMODEL: tl.constexpr,
 ):
+    """Flash Attention forward kernel with custom mask support.
+
+    Implements memory-efficient attention using online softmax with support for custom masks,
+    causal masking, sliding window attention, ALiBi biases, and dropout.
+
+    Args:
+        Q: Query tensor pointer.
+        K: Key tensor pointer.
+        V: Value tensor pointer.
+        Out: Output tensor pointer.
+        Mask: Custom attention mask pointer.
+        ALiBi: ALiBi slope values pointer.
+        L: Logsumexp values pointer for numerical stability.
+        M: Max values pointer for numerical stability.
+        philox_seed: Random seed for dropout.
+        philox_offset: Random offset for dropout.
+        stride_*: Stride values for tensor dimensions.
+        batch_size: Number of sequences in the batch.
+        num_heads: Number of attention heads.
+        seq_len: Sequence length.
+        head_dim: Dimension of each attention head.
+        scale: Scaling factor for attention scores (typically 1/sqrt(head_dim)).
+        dropout_p: Dropout probability.
+        window_left: Left window size for sliding window attention.
+        window_right: Right window size for sliding window attention.
+        has_alibi: Whether to apply ALiBi biases.
+        has_dropout: Whether to apply dropout.
+        has_window: Whether to apply sliding window attention.
+        has_mask: Whether to apply custom mask.
+        causal: Whether to apply causal masking.
+        BLOCK_M: Block size for query dimension.
+        BLOCK_N: Block size for key dimension.
+        BLOCK_DMODEL: Block size for head dimension.
+    """
     pid_b = tl.program_id(0)
     pid_h = tl.program_id(1)
     pid_m = tl.program_id(2)
@@ -242,6 +276,38 @@ def _fwd_kernel(
     BLOCK_N: tl.constexpr,
     BLOCK_DMODEL: tl.constexpr,
 ):
+    """Flash Attention forward kernel without custom mask.
+
+    Implements memory-efficient attention using online softmax with support for
+    causal masking, sliding window attention, ALiBi biases, and dropout.
+
+    Args:
+        Q: Query tensor pointer.
+        K: Key tensor pointer.
+        V: Value tensor pointer.
+        Out: Output tensor pointer.
+        ALiBi: ALiBi slope values pointer.
+        L: Logsumexp values pointer for numerical stability.
+        M: Max values pointer for numerical stability.
+        philox_seed: Random seed for dropout.
+        philox_offset: Random offset for dropout.
+        stride_*: Stride values for tensor dimensions.
+        batch_size: Number of sequences in the batch.
+        num_heads: Number of attention heads.
+        seq_len: Sequence length.
+        head_dim: Dimension of each attention head.
+        scale: Scaling factor for attention scores (typically 1/sqrt(head_dim)).
+        dropout_p: Dropout probability.
+        window_left: Left window size for sliding window attention.
+        window_right: Right window size for sliding window attention.
+        has_alibi: Whether to apply ALiBi biases.
+        has_dropout: Whether to apply dropout.
+        has_window: Whether to apply sliding window attention.
+        causal: Whether to apply causal masking.
+        BLOCK_M: Block size for query dimension.
+        BLOCK_N: Block size for key dimension.
+        BLOCK_DMODEL: Block size for head dimension.
+    """
     pid_b = tl.program_id(0)
     pid_h = tl.program_id(1)
     pid_m = tl.program_id(2)
@@ -369,6 +435,38 @@ def _fwd_kernel(
 
 
 class TritonAttentionKernel:
+    """Triton-accelerated Flash Attention kernel wrapper.
+
+    Provides a high-level interface for memory-efficient attention computation using
+    Flash Attention algorithm with support for various attention patterns including
+    causal masking, sliding window, custom masks, ALiBi biases, and dropout.
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(q, k, v, attn_mask=None, causal=False, scale=None, dropout_p=0.0, window_size=None, alibi_slopes=None):
+            Applies Flash Attention computation with various attention patterns.
+
+            Parameters:
+                q (torch.Tensor): Query tensor of shape (batch_size, seq_len, num_heads, head_dim).
+                k (torch.Tensor): Key tensor of shape (batch_size, seq_len, num_heads, head_dim).
+                v (torch.Tensor): Value tensor of shape (batch_size, seq_len, num_heads, head_dim).
+                attn_mask (torch.Tensor, optional): Custom attention mask (2D, 3D, or 4D). Defaults to None.
+                causal (bool, optional): Whether to apply causal masking. Defaults to False.
+                scale (float, optional): Scaling factor for attention scores. Defaults to 1/sqrt(head_dim).
+                dropout_p (float, optional): Dropout probability. Defaults to 0.0.
+                window_size (tuple, optional): Tuple (window_left, window_right) for sliding window attention. Defaults to None.
+                alibi_slopes (torch.Tensor, optional): Per-head slope values for ALiBi biases. Defaults to None.
+
+            Returns:
+                torch.Tensor: Output tensor of shape (batch_size, seq_len, num_heads, head_dim).
+
+            The method automatically selects the appropriate kernel variant based on whether
+            a custom mask is provided. Supports combining multiple attention patterns
+            (e.g., causal + sliding window + ALiBi).
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:

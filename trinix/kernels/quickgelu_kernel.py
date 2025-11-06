@@ -12,6 +12,17 @@ def quickgelu_forward_kernel(
     n_elements: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """QuickGELU activation forward kernel.
+
+    Computes QuickGELU activation: x * sigmoid(1.702 * x).
+    QuickGELU is a faster approximation of GELU using sigmoid instead of tanh.
+
+    Args:
+        Y_ptr: Pointer to output tensor.
+        X_ptr: Pointer to input tensor.
+        n_elements: Total number of elements in the tensor.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -32,6 +43,17 @@ def quickgelu_backward_kernel(
     n_elements: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """QuickGELU activation backward kernel.
+
+    Computes gradient of QuickGELU activation with respect to input.
+
+    Args:
+        dX_ptr: Pointer to input gradient tensor.
+        dY_ptr: Pointer to output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        n_elements: Total number of elements in the tensor.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -49,6 +71,32 @@ def quickgelu_backward_kernel(
 
 
 class TritonQuickGELUFunction(torch.autograd.Function):
+    """Autograd function for QuickGELU activation.
+
+    This function wraps the QuickGELU kernel for automatic differentiation.
+
+    Methods:
+        forward(ctx, X):
+            Computes QuickGELU activation: x * sigmoid(1.702 * x).
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                X (torch.Tensor): Input tensor of any shape.
+
+            Returns:
+                torch.Tensor: Output tensor with QuickGELU activation applied, same shape as input.
+
+        backward(ctx, dY):
+            Backward pass for QuickGELU activation.
+
+            Parameters:
+                ctx: Autograd context containing saved input tensor.
+                dY: Gradient of loss with respect to the output.
+
+            Returns:
+                torch.Tensor: Gradient of loss with respect to the input.
+    """
+
     @staticmethod
     def forward(ctx, X):
         shape = X.shape
@@ -94,6 +142,28 @@ class TritonQuickGELUFunction(torch.autograd.Function):
 
 
 class TritonQuickGELUKernel:
+    """Triton-accelerated QuickGELU activation kernel wrapper.
+
+    Provides a high-level interface for applying QuickGELU activation function,
+    which is a faster approximation of GELU: x * sigmoid(1.702 * x).
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(X):
+            Applies QuickGELU activation to the input tensor.
+
+            Parameters:
+                X (torch.Tensor): Input tensor of any shape.
+
+            Returns:
+                torch.Tensor: Output tensor with QuickGELU activation applied, same shape as input.
+                    Computed as: x * sigmoid(1.702 * x).
+                    QuickGELU is a computationally efficient approximation of GELU that uses
+                    sigmoid instead of the tanh-based approximation.
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:

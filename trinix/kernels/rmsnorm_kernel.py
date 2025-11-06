@@ -17,6 +17,22 @@ def rmsnorm_forward_kernel(
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """RMS Normalization forward kernel.
+
+    Normalizes input using root mean square (without mean centering) and applies
+    learned weight scaling. RMSNorm: x / sqrt(mean(x^2) + eps) * weight.
+
+    Args:
+        Y_ptr: Pointer to output tensor.
+        Y_row_stride: Stride for row dimension in output tensor.
+        X_ptr: Pointer to input tensor.
+        X_row_stride: Stride for row dimension in input tensor.
+        W_ptr: Pointer to weight tensor.
+        rstd_ptr: Pointer to reciprocal standard deviation tensor (for backward pass).
+        n_cols: Number of columns (normalization dimension).
+        eps: Small constant for numerical stability.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
 
     col_offsets = tl.arange(0, BLOCK_SIZE)
@@ -54,6 +70,25 @@ def rmsnorm_backward_kernel_fused(
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """RMS Normalization backward kernel using atomic operations.
+
+    Computes gradients for input and weight using atomic adds for weight gradients.
+    Used when batch size is large (> 32).
+
+    Args:
+        dY_ptr: Pointer to output gradient tensor.
+        dY_row_stride: Stride for row dimension in output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        X_row_stride: Stride for row dimension in input tensor.
+        W_ptr: Pointer to weight tensor.
+        rstd_ptr: Pointer to reciprocal standard deviation from forward pass.
+        dX_ptr: Pointer to input gradient tensor.
+        dX_row_stride: Stride for row dimension in input gradient tensor.
+        dW_ptr: Pointer to weight gradient tensor.
+        n_cols: Number of columns (normalization dimension).
+        eps: Small constant for numerical stability.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
 
     col_offsets = tl.arange(0, BLOCK_SIZE)
@@ -103,6 +138,26 @@ def rmsnorm_backward_kernel_welford(
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """RMS Normalization backward kernel using locks for synchronization.
+
+    Computes gradients for input and weight using locks for weight gradient accumulation.
+    Used when batch size is small (<= 32) to avoid atomic operation overhead.
+
+    Args:
+        dY_ptr: Pointer to output gradient tensor.
+        dY_row_stride: Stride for row dimension in output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        X_row_stride: Stride for row dimension in input tensor.
+        W_ptr: Pointer to weight tensor.
+        rstd_ptr: Pointer to reciprocal standard deviation from forward pass.
+        dX_ptr: Pointer to input gradient tensor.
+        dX_row_stride: Stride for row dimension in input gradient tensor.
+        dW_ptr: Pointer to weight gradient tensor.
+        Lock_ptr: Pointer to lock for synchronization.
+        n_cols: Number of columns (normalization dimension).
+        eps: Small constant for numerical stability.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
 
     col_offsets = tl.arange(0, BLOCK_SIZE)
@@ -143,6 +198,36 @@ def rmsnorm_backward_kernel_welford(
 
 
 class TritonRMSNormFunction(torch.autograd.Function):
+    """Autograd function for RMS Normalization.
+
+    This function wraps the RMS Normalization kernel for automatic differentiation.
+    Automatically selects the appropriate backward kernel based on batch size.
+
+    Methods:
+        forward(ctx, X, W, eps):
+            Computes RMS Normalization with weight scaling.
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                X (torch.Tensor): Input tensor.
+                W (torch.Tensor): Weight tensor for scaling.
+                eps (float): Small constant for numerical stability (typically 1e-5).
+
+            Returns:
+                torch.Tensor: Normalized output tensor with same shape as input.
+
+        backward(ctx, dY):
+            Backward pass for RMS Normalization.
+
+            Parameters:
+                ctx: Autograd context containing saved tensors (X, W, rstd).
+                dY: Gradient of loss with respect to the output.
+
+            Returns:
+                tuple: (dX, dW, None) - Gradients for input, weight, and None for eps.
+                    Uses lock-based kernel for small batches (<=32) and atomic operations for larger batches.
+    """
+
     @staticmethod
     def forward(ctx, X, W, eps):
         shape = X.shape
@@ -229,6 +314,33 @@ class TritonRMSNormFunction(torch.autograd.Function):
 
 
 class TritonRMSNormKernel:
+    """Triton-accelerated RMS Normalization kernel wrapper.
+
+    Provides a high-level interface for applying RMS (Root Mean Square) Normalization
+    with learned weight scaling. RMSNorm is a simpler alternative to LayerNorm that
+    normalizes using only the RMS without centering (no mean subtraction).
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(X, W, eps):
+            Applies RMS Normalization with weight scaling.
+
+            Parameters:
+                X (torch.Tensor): Input tensor of any shape.
+                W (torch.Tensor): Weight tensor for scaling, shape matches last dimension of X.
+                eps (float): Small constant for numerical stability (typically 1e-5 or 1e-6).
+
+            Returns:
+                torch.Tensor: Normalized output tensor with same shape as input.
+                    Computed as: (X / sqrt(mean(X^2) + eps)) * W.
+                    Unlike LayerNorm, RMSNorm does not subtract the mean, making it simpler and faster.
+
+            The backward pass automatically selects between lock-based kernel (for batch size <= 32)
+            and atomic operations kernel (for larger batches) for optimal performance.
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:

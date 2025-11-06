@@ -35,7 +35,6 @@ from .layers.embeddings import (
 from .layers.norm import FastLayerNorm, FastRMSNorm
 from .optim import FastAdamW
 
-__version__ = "0.1.0"
 __all__ = [
     "layers",
     "kernels",
@@ -64,3 +63,8 @@ __all__ = [
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
 ]
+
+
+from trinix.version import version
+
+__version__ = "0.1.1"

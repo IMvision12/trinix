@@ -7,6 +7,34 @@ from ..kernels.lion_kernel import TritonLionKernel
 
 
 class FastLion(Optimizer):
+    """Fast Lion (EvoLved Sign Momentum) optimizer with automatic Triton/PyTorch backend selection.
+
+    Implements Lion algorithm which uses sign-based updates with momentum. Lion is more
+    memory-efficient than Adam/AdamW as it only maintains first-order moments (no second moment).
+    Despite its simplicity, Lion often matches or exceeds Adam's performance while using less memory.
+    Automatically uses Triton kernels for CUDA tensors when available.
+
+    Args:
+        params (iterable): Iterable of parameters to optimize or dicts defining parameter groups.
+        lr (float, optional): Learning rate. Defaults to 1e-4.
+            Note: Lion typically uses smaller learning rates than Adam (about 3-10x smaller).
+        betas (Tuple[float, float], optional): Coefficients for computing running averages.
+            beta1 is for interpolation, beta2 is for momentum update. Defaults to (0.9, 0.99).
+        weight_decay (float, optional): Weight decay coefficient. Defaults to 0.0.
+        use_triton (bool, optional): Whether to enable Triton kernels for CUDA tensors.
+            Defaults to True.
+
+    Examples:
+        >>> optimizer = FastLion(model.parameters(), lr=1e-4, weight_decay=0.01)
+        >>> optimizer.zero_grad()
+        >>> loss.backward()
+        >>> optimizer.step()
+
+        >>> # Lion typically uses smaller LR than Adam
+        >>> # If Adam uses lr=1e-3, try Lion with lr=1e-4 or 3e-4
+        >>> optimizer = FastLion(model.parameters(), lr=3e-4, betas=(0.9, 0.99))
+    """
+
     def __init__(
         self,
         params: Union[Iterable[torch.Tensor], Iterable[dict]],

@@ -8,6 +8,54 @@ from .base import FastBaseAttention
 
 
 class FastMultiHeadSelfAttention(FastBaseAttention):
+    """Fast Multi-Head Self-Attention layer with fused QKV projection.
+
+    Optimized self-attention layer that computes Q, K, V from the same input using a single
+    fused projection. This is more efficient than separate projections and is commonly used
+    in transformer encoder blocks and decoder-only models.
+
+    Args:
+        embed_dim (int): Total dimension of the model.
+        num_heads (int): Number of parallel attention heads.
+        dropout (float, optional): Dropout probability. Defaults to 0.0.
+        bias (bool, optional): Whether to use bias in projections. Defaults to True.
+        kernel_type (str, optional): Attention backend ('flash', 'triton', 'pytorch'). Defaults to 'flash'.
+        causal (bool, optional): Whether to apply causal masking. Defaults to False.
+        head_dim (int, optional): Dimension per head. If None, uses embed_dim // num_heads. Defaults to None.
+        position_method (str or nn.Module, optional): Position encoding method. Defaults to 'none'.
+        max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
+        rope_base (float, optional): Base for RoPE frequencies. Defaults to 10000.0.
+        max_relative_position (int, optional): Max relative position for relative embeddings. Defaults to 128.
+        use_sliding_window (bool, optional): Enable sliding window attention. Defaults to False.
+        sliding_window_size (int, optional): Sliding window size. Defaults to None.
+        qk_norm (bool, optional): Normalize queries and keys. Defaults to False.
+        qk_norm_type (str, optional): Normalization type ('rmsnorm' or 'layernorm'). Defaults to 'rmsnorm'.
+        use_triton_norm (bool, optional): Use Triton for normalization. Defaults to True.
+        use_triton_embeddings (bool, optional): Use Triton for position embeddings. Defaults to True.
+        add_zero_attn (bool, optional): Add zero attention token. Defaults to False.
+        batch_first (bool, optional): If True, input shape is (batch, seq, feature). Defaults to True.
+
+    Examples:
+        >>> # Standard self-attention for transformer encoder
+        >>> attn = FastMultiHeadSelfAttention(embed_dim=768, num_heads=12)
+        >>> x = torch.randn(4, 128, 768)
+        >>> output = attn(x)
+
+        >>> # Causal self-attention for GPT-style decoder
+        >>> attn = FastMultiHeadSelfAttention(
+        ...     embed_dim=768, num_heads=12, causal=True,
+        ...     position_method='rope'
+        ... )
+        >>> x = torch.randn(4, 128, 768)
+        >>> output, kv_cache = attn(x, use_cache=True)
+
+    Notes:
+        - Uses fused QKV projection for efficiency (single matrix multiply)
+        - Only supports self-attention (query, key, value from same input)
+        - For cross-attention, use FastMultiHeadAttention instead
+        - Commonly used in BERT, GPT, and other transformer models
+    """
+
     def __init__(
         self,
         embed_dim: int,

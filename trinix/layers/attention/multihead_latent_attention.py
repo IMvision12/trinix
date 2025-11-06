@@ -8,6 +8,71 @@ from .base import FastBaseAttention
 
 
 class FastMultiHeadLatentAttention(FastBaseAttention):
+    """Fast Multi-Head Latent Attention with compressed KV cache.
+
+    Latent attention compresses keys and values through a low-dimensional bottleneck before
+    computing attention. This dramatically reduces memory usage for the KV cache while
+    maintaining reasonable quality. The compression is done via down-projection to a latent
+    space, then up-projection back to the full dimension.
+
+    This is particularly useful for:
+    - Long-context inference where KV cache becomes a bottleneck
+    - Memory-constrained environments
+    - Models that need to process very long sequences
+
+    Args:
+        embed_dim (int): Total dimension of the model.
+        num_heads (int): Number of parallel attention heads.
+        dropout (float, optional): Dropout probability. Defaults to 0.0.
+        bias (bool, optional): Whether to use bias in projections. Defaults to True.
+        kernel_type (str, optional): Attention backend ('flash', 'triton', 'pytorch'). Defaults to 'flash'.
+        causal (bool, optional): Whether to apply causal masking. Defaults to False.
+        latent_dim (int, optional): Dimension of the latent bottleneck. If None, uses
+            max(16, embed_dim // 8). Smaller values = more compression. Defaults to None.
+        position_method (str or nn.Module, optional): Position encoding method. Defaults to 'none'.
+        max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
+        rope_base (float, optional): Base for RoPE frequencies. Defaults to 10000.0.
+        max_relative_position (int, optional): Max relative position for relative embeddings. Defaults to 128.
+        use_sliding_window (bool, optional): Enable sliding window attention. Defaults to False.
+        sliding_window_size (int, optional): Sliding window size. Defaults to None.
+        qk_norm (bool, optional): Normalize queries and keys. Defaults to False.
+        qk_norm_type (str, optional): Normalization type ('rmsnorm' or 'layernorm'). Defaults to 'rmsnorm'.
+        use_triton_norm (bool, optional): Use Triton for normalization. Defaults to True.
+        use_triton_embeddings (bool, optional): Use Triton for position embeddings. Defaults to True.
+        add_zero_attn (bool, optional): Add zero attention token. Defaults to False.
+        batch_first (bool, optional): If True, input shape is (batch, seq, feature). Defaults to True.
+
+    Examples:
+        >>> # Latent attention with 8x compression (4096 -> 512)
+        >>> attn = FastMultiHeadLatentAttention(
+        ...     embed_dim=4096, num_heads=32, latent_dim=512
+        ... )
+        >>> x = torch.randn(4, 128, 4096)
+        >>> output, latent_cache = attn(x, use_cache=True)
+
+        >>> # For long-context generation with memory efficiency
+        >>> attn = FastMultiHeadLatentAttention(
+        ...     embed_dim=2048, num_heads=16, latent_dim=256,
+        ...     causal=True, position_method='rope'
+        ... )
+        >>> # Cache stores compressed KV in latent space
+        >>> output, cache = attn(x, use_cache=True)
+        >>> # Continue generation with cached context
+        >>> next_output, cache = attn(next_x, use_cache=True)
+
+        >>> # Reset cache when starting new sequence
+        >>> attn.reset_cache()
+
+    Notes:
+        - KV cache size reduced by factor of (embed_dim / latent_dim)
+        - Default latent_dim is embed_dim // 8 (8x compression)
+        - Queries are also compressed through latent space for consistency
+        - Cache stores compressed latent representations, not full KV
+        - Call reset_cache() to clear the cache between sequences
+        - Trade-off: memory efficiency vs. some quality loss from compression
+        - Most effective for very long sequences (>2048 tokens)
+    """
+
     def __init__(
         self,
         embed_dim: int,

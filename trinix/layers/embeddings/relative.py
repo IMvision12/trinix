@@ -11,6 +11,29 @@ except (ImportError, ModuleNotFoundError):
 
 
 class FastRelativePositionEmbedding(nn.Module):
+    """Fast relative position embedding layer with learned position embeddings.
+
+    Computes position-dependent embeddings based on relative distances between query and key positions.
+    Uses learned embeddings for each relative position within a maximum range.
+    Automatically uses Triton kernels when available, falling back to PyTorch implementation.
+
+    Args:
+        num_heads (int): Number of attention heads.
+        head_dim (int): Dimension of each attention head.
+        max_relative_position (int, optional): Maximum relative position distance to consider.
+            Positions beyond this range are clamped. Defaults to 128.
+        use_triton (bool, optional): Whether to enable Triton kernels. Defaults to True.
+
+    Shape:
+        - Output: (batch_size, num_heads, seq_len, seq_len, head_dim) containing
+          learned embeddings for each relative position pair
+
+    Examples:
+        >>> rel_pos = FastRelativePositionEmbedding(num_heads=8, head_dim=64)
+        >>> embeddings = rel_pos(seq_len=128, batch_size=4)  # shape: (4, 8, 128, 128, 64)
+        >>> # Use in attention computation with relative position information
+    """
+
     def __init__(
         self,
         num_heads: int,

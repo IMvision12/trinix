@@ -8,6 +8,51 @@ from .base import FastBaseAttention
 
 
 class FastMultiQueryAttention(FastBaseAttention):
+    """Fast Multi-Query Attention (MQA) layer.
+
+    MQA uses a single key-value head shared across all query heads, dramatically reducing
+    the KV cache size for efficient inference. This is the most memory-efficient attention
+    variant, trading some quality for significant speed and memory improvements.
+
+    Args:
+        embed_dim (int): Total dimension of the model.
+        num_heads (int): Number of query heads (all share the same single KV head).
+        dropout (float, optional): Dropout probability. Defaults to 0.0.
+        bias (bool, optional): Whether to use bias in projections. Defaults to True.
+        kernel_type (str, optional): Attention backend ('flash', 'triton', 'pytorch'). Defaults to 'flash'.
+        causal (bool, optional): Whether to apply causal masking. Defaults to False.
+        head_dim (int, optional): Dimension per head. If None, uses embed_dim // num_heads. Defaults to None.
+        position_method (str or nn.Module, optional): Position encoding method. Defaults to 'none'.
+        max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
+        rope_base (float, optional): Base for RoPE frequencies. Defaults to 10000.0.
+        max_relative_position (int, optional): Max relative position for relative embeddings. Defaults to 128.
+        use_sliding_window (bool, optional): Enable sliding window attention. Defaults to False.
+        sliding_window_size (int, optional): Sliding window size. Defaults to None.
+        qk_norm (bool, optional): Normalize queries and keys. Defaults to False.
+        qk_norm_type (str, optional): Normalization type ('rmsnorm' or 'layernorm'). Defaults to 'rmsnorm'.
+        use_triton_norm (bool, optional): Use Triton for normalization. Defaults to True.
+        use_triton_embeddings (bool, optional): Use Triton for position embeddings. Defaults to True.
+
+    Examples:
+        >>> # MQA with 32 query heads sharing 1 KV head (32x reduction in KV cache)
+        >>> attn = FastMultiQueryAttention(embed_dim=4096, num_heads=32)
+        >>> x = torch.randn(4, 128, 4096)
+        >>> output, kv_cache = attn(x, use_cache=True)
+
+        >>> # Fast inference for code generation models
+        >>> attn = FastMultiQueryAttention(
+        ...     embed_dim=2048, num_heads=16,
+        ...     causal=True, position_method='rope'
+        ... )
+
+    Notes:
+        - Uses only 1 KV head regardless of num_heads
+        - Reduces KV cache size by factor of num_heads
+        - Most memory-efficient attention variant
+        - Used in models like PaLM, StarCoder for fast inference
+        - May have slightly lower quality than MHA or GQA
+    """
+
     def __init__(
         self,
         embed_dim: int,

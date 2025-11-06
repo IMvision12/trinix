@@ -21,6 +21,24 @@ def layernorm_forward_kernel(
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Layer Normalization forward kernel.
+
+    Normalizes input across the last dimension using mean and variance,
+    then applies affine transformation with learned weight and bias.
+
+    Args:
+        Y_ptr: Pointer to output tensor.
+        Y_row_stride: Stride for row dimension in output tensor.
+        X_ptr: Pointer to input tensor.
+        X_row_stride: Stride for row dimension in input tensor.
+        W_ptr: Pointer to weight tensor.
+        b_ptr: Pointer to bias tensor.
+        rstd_ptr: Pointer to reciprocal standard deviation tensor (for backward pass).
+        mean_ptr: Pointer to mean tensor (for backward pass).
+        n_cols: Number of columns (normalization dimension).
+        eps: Small constant for numerical stability.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -58,6 +76,27 @@ def layernorm_backward_kernel_fused(
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Layer Normalization backward kernel using atomic operations.
+
+    Computes gradients for input, weight, and bias using atomic adds for weight/bias gradients.
+    Used when batch size is large (> 32).
+
+    Args:
+        dY_ptr: Pointer to output gradient tensor.
+        dY_row_stride: Stride for row dimension in output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        X_row_stride: Stride for row dimension in input tensor.
+        W_ptr: Pointer to weight tensor.
+        rstd_ptr: Pointer to reciprocal standard deviation from forward pass.
+        mean_ptr: Pointer to mean from forward pass.
+        dX_ptr: Pointer to input gradient tensor.
+        dX_row_stride: Stride for row dimension in input gradient tensor.
+        dW_ptr: Pointer to weight gradient tensor.
+        db_ptr: Pointer to bias gradient tensor.
+        n_cols: Number of columns (normalization dimension).
+        eps: Small constant for numerical stability.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -106,6 +145,28 @@ def layernorm_backward_kernel_welford(
     eps: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Layer Normalization backward kernel using locks for synchronization.
+
+    Computes gradients for input, weight, and bias using locks for weight/bias gradient accumulation.
+    Used when batch size is small (<= 32) to avoid atomic operation overhead.
+
+    Args:
+        dY_ptr: Pointer to output gradient tensor.
+        dY_row_stride: Stride for row dimension in output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        X_row_stride: Stride for row dimension in input tensor.
+        W_ptr: Pointer to weight tensor.
+        rstd_ptr: Pointer to reciprocal standard deviation from forward pass.
+        mean_ptr: Pointer to mean from forward pass.
+        dX_ptr: Pointer to input gradient tensor.
+        dX_row_stride: Stride for row dimension in input gradient tensor.
+        dW_ptr: Pointer to weight gradient tensor.
+        db_ptr: Pointer to bias gradient tensor.
+        Lock_ptr: Pointer to lock for synchronization.
+        n_cols: Number of columns (normalization dimension).
+        eps: Small constant for numerical stability.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -140,6 +201,37 @@ def layernorm_backward_kernel_welford(
 
 
 class TritonLayerNormFunction(torch.autograd.Function):
+    """Autograd function for Layer Normalization.
+
+    This function wraps the Layer Normalization kernel for automatic differentiation.
+    Automatically selects the appropriate backward kernel based on batch size.
+
+    Methods:
+        forward(ctx, X, W, b, eps):
+            Computes Layer Normalization with affine transformation.
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                X (torch.Tensor): Input tensor.
+                W (torch.Tensor): Weight tensor for affine transformation.
+                b (torch.Tensor): Bias tensor for affine transformation.
+                eps (float): Small constant for numerical stability (typically 1e-5).
+
+            Returns:
+                torch.Tensor: Normalized output tensor with same shape as input.
+
+        backward(ctx, dY):
+            Backward pass for Layer Normalization.
+
+            Parameters:
+                ctx: Autograd context containing saved tensors (X, W, rstd, mean).
+                dY: Gradient of loss with respect to the output.
+
+            Returns:
+                tuple: (dX, dW, db, None) - Gradients for input, weight, bias, and None for eps.
+                    Uses lock-based kernel for small batches (<=32) and atomic operations for larger batches.
+    """
+
     @staticmethod
     def forward(ctx, X, W, b, eps):
         shape = X.shape
@@ -224,6 +316,33 @@ class TritonLayerNormFunction(torch.autograd.Function):
 
 
 class TritonLayerNormKernel:
+    """Triton-accelerated Layer Normalization kernel wrapper.
+
+    Provides a high-level interface for applying Layer Normalization with learned
+    affine transformation. Automatically selects the appropriate backward kernel
+    based on batch size for optimal performance.
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(X, W, b, eps):
+            Applies Layer Normalization with affine transformation.
+
+            Parameters:
+                X (torch.Tensor): Input tensor of any shape.
+                W (torch.Tensor): Weight tensor for affine transformation, shape matches last dimension of X.
+                b (torch.Tensor): Bias tensor for affine transformation, shape matches last dimension of X.
+                eps (float): Small constant for numerical stability (typically 1e-5).
+
+            Returns:
+                torch.Tensor: Normalized output tensor with same shape as input.
+                    Computed as: (X - mean(X)) / sqrt(var(X) + eps) * W + b
+
+            The backward pass automatically selects between lock-based kernel (for batch size <= 32)
+            and atomic operations kernel (for larger batches) for optimal performance.
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:

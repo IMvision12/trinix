@@ -12,6 +12,16 @@ def squared_relu_forward_kernel(
     n_elements: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Squared ReLU activation forward kernel.
+
+    Computes Squared ReLU activation: (max(0, x))^2.
+
+    Args:
+        Y_ptr: Pointer to output tensor.
+        X_ptr: Pointer to input tensor.
+        n_elements: Total number of elements in the tensor.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -31,6 +41,17 @@ def squared_relu_backward_kernel(
     n_elements: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Squared ReLU activation backward kernel.
+
+    Computes gradient of Squared ReLU activation with respect to input.
+
+    Args:
+        dX_ptr: Pointer to input gradient tensor.
+        dY_ptr: Pointer to output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        n_elements: Total number of elements in the tensor.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -46,6 +67,32 @@ def squared_relu_backward_kernel(
 
 
 class TritonSquaredReLUFunction(torch.autograd.Function):
+    """Autograd function for Squared ReLU activation.
+
+    This function wraps the Squared ReLU kernel for automatic differentiation.
+
+    Methods:
+        forward(ctx, X):
+            Computes Squared ReLU activation: (max(0, x))^2.
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                X (torch.Tensor): Input tensor of any shape.
+
+            Returns:
+                torch.Tensor: Output tensor with Squared ReLU activation applied, same shape as input.
+
+        backward(ctx, dY):
+            Backward pass for Squared ReLU activation.
+
+            Parameters:
+                ctx: Autograd context containing saved input tensor.
+                dY: Gradient of loss with respect to the output.
+
+            Returns:
+                torch.Tensor: Gradient of loss with respect to the input.
+    """
+
     @staticmethod
     def forward(ctx, X):
         shape = X.shape
@@ -91,6 +138,28 @@ class TritonSquaredReLUFunction(torch.autograd.Function):
 
 
 class TritonSquaredReLUKernel:
+    """Triton-accelerated Squared ReLU activation kernel wrapper.
+
+    Provides a high-level interface for applying Squared ReLU activation function,
+    which squares the output of ReLU: (max(0, x))^2.
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(X):
+            Applies Squared ReLU activation to the input tensor.
+
+            Parameters:
+                X (torch.Tensor): Input tensor of any shape.
+
+            Returns:
+                torch.Tensor: Output tensor with Squared ReLU activation applied, same shape as input.
+                    Computed as: (max(0, x))^2.
+                    This activation provides stronger non-linearity than standard ReLU and
+                    can help with gradient flow in deep networks.
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:

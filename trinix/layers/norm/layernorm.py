@@ -5,6 +5,33 @@ from ...kernels import TritonLayerNormKernel
 
 
 class FastLayerNorm(nn.Module):
+    """Fast Layer Normalization with automatic Triton/PyTorch backend selection.
+
+    Layer Normalization normalizes inputs across the feature dimension by subtracting the mean
+    and dividing by the standard deviation, then applies learned affine transformation.
+    Automatically uses Triton kernels for large tensors (hidden_size >= 2048) when available,
+    falling back to PyTorch's native implementation otherwise.
+
+    Args:
+        normalized_shape (int or tuple): Shape of the input to be normalized (typically hidden_size).
+        eps (float, optional): Small constant for numerical stability. Defaults to 1e-5.
+        elementwise_affine (bool, optional): Whether to learn affine parameters (weight and bias).
+            Defaults to True.
+        use_triton (bool, optional): Whether to enable Triton kernels. Defaults to True.
+
+    Shape:
+        - Input: (*, normalized_shape) where * means any number of dimensions
+        - Output: (*, normalized_shape) same shape as input
+
+    Examples:
+        >>> layer_norm = FastLayerNorm(normalized_shape=768)
+        >>> x = torch.randn(32, 128, 768)  # (batch, seq_len, hidden_size)
+        >>> output = layer_norm(x)  # shape: (32, 128, 768)
+
+        >>> # Without affine transformation
+        >>> layer_norm = FastLayerNorm(768, elementwise_affine=False)
+    """
+
     def __init__(
         self,
         normalized_shape: int,

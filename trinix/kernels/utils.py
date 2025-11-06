@@ -3,6 +3,12 @@ import triton
 
 
 def get_cuda_compute_capability():
+    """Get CUDA compute capability of the current device.
+
+    Returns:
+        int: Compute capability as a two-digit number (e.g., 75 for 7.5, 80 for 8.0).
+             Returns 75 if CUDA is not available.
+    """
     if not torch.cuda.is_available():
         return 75
     device_properties = torch.cuda.get_device_properties(0)
@@ -10,6 +16,19 @@ def get_cuda_compute_capability():
 
 
 def calculate_triton_kernel_configuration(input_vector_length):
+    """Calculate optimal Triton kernel block size and warp count.
+
+    Determines the best block size and number of warps based on input size and
+    GPU compute capability for optimal performance.
+
+    Args:
+        input_vector_length: Length of the input vector to process.
+
+    Returns:
+        tuple: (optimal_block_size, optimal_warp_count) where:
+            - optimal_block_size: Power of 2 block size for Triton kernel
+            - optimal_warp_count: Number of warps to use (2, 4, 8, 16, or 32)
+    """
     optimal_block_size = triton.next_power_of_2(input_vector_length)
     gpu_compute_capability = get_cuda_compute_capability()
     has_modern_architecture = gpu_compute_capability >= 80
@@ -39,6 +58,13 @@ def calculate_triton_kernel_configuration(input_vector_length):
 
 
 def get_gpu_shared_memory_limit():
+    """Get the shared memory limit per block for the current GPU.
+
+    Returns:
+        int: Shared memory limit in bytes. Returns default values based on
+             compute capability if CUDA is not available or properties cannot
+             be queried (48KB for older GPUs, 96KB for SM 7.x, 164KB for SM 8.x+).
+    """
     if not torch.cuda.is_available():
         return 48 * 1024
 
@@ -59,6 +85,21 @@ def get_gpu_shared_memory_limit():
 
 
 def calculate_attention_block_sizes(head_dim, seq_len=None):
+    """Calculate optimal block sizes for Flash Attention kernels.
+
+    Determines block sizes for query (BLOCK_M), key (BLOCK_N), and head dimension
+    (BLOCK_DMODEL) based on GPU compute capability and shared memory constraints.
+
+    Args:
+        head_dim: Dimension of each attention head.
+        seq_len: Sequence length (optional, currently unused but reserved for future optimizations).
+
+    Returns:
+        tuple: (BLOCK_M, BLOCK_N, BLOCK_DMODEL) where:
+            - BLOCK_M: Block size for query sequence dimension
+            - BLOCK_N: Block size for key sequence dimension
+            - BLOCK_DMODEL: Block size for head dimension (power of 2)
+    """
     gpu_compute_capability = get_cuda_compute_capability()
     shared_mem_limit = get_gpu_shared_memory_limit()
 

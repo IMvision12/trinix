@@ -13,6 +13,31 @@ except (ImportError, ModuleNotFoundError):
 
 
 class FastRoPEPositionEmbedding(nn.Module):
+    """Fast RoPE (Rotary Position Embedding) layer.
+
+    RoPE encodes position information by rotating pairs of features using position-dependent
+    rotation matrices. This allows the model to naturally incorporate relative position information
+    without adding extra parameters. Automatically uses Triton kernels when available.
+
+    Args:
+        dim (int): Dimension of the embeddings (typically head_dim).
+        max_position_embeddings (int, optional): Maximum sequence length. Defaults to 2048.
+        base (float, optional): Base for computing rotation frequencies. Defaults to 10000.0.
+        use_triton (bool, optional): Whether to enable Triton kernels. Defaults to True.
+
+    Shape:
+        - forward output: Tuple of (cos, sin) tensors, each of shape (seq_len, dim)
+        - apply_rotary_pos_emb output: Tuple of (rotated_q, rotated_k), each of shape
+          (batch_size, seq_len, num_heads, head_dim)
+
+    Examples:
+        >>> rope = FastRoPEPositionEmbedding(dim=64)
+        >>> q = torch.randn(4, 128, 8, 64)  # (batch, seq_len, num_heads, head_dim)
+        >>> k = torch.randn(4, 128, 8, 64)
+        >>> cos, sin = rope(q, seq_len=128)
+        >>> q_rot, k_rot = rope.apply_rotary_pos_emb(q, k, cos, sin)
+    """
+
     def __init__(
         self,
         dim: int,

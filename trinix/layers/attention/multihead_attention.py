@@ -8,6 +8,48 @@ from .base import FastBaseAttention
 
 
 class FastMultiHeadAttention(FastBaseAttention):
+    """Fast Multi-Head Attention layer with cross-attention support.
+
+    Standard multi-head attention that supports both self-attention and cross-attention.
+    Each head attends to all positions independently, then outputs are concatenated.
+    Supports separate key and value input dimensions for encoder-decoder architectures.
+
+    Args:
+        embed_dim (int): Total dimension of the model.
+        num_heads (int): Number of parallel attention heads.
+        dropout (float, optional): Dropout probability. Defaults to 0.0.
+        bias (bool, optional): Whether to use bias in projections. Defaults to True.
+        kernel_type (str, optional): Attention backend ('flash', 'triton', 'pytorch'). Defaults to 'flash'.
+        causal (bool, optional): Whether to apply causal masking. Defaults to False.
+        head_dim (int, optional): Dimension per head. If None, uses embed_dim // num_heads. Defaults to None.
+        position_method (str or nn.Module, optional): Position encoding method. Defaults to 'none'.
+        max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
+        rope_base (float, optional): Base for RoPE frequencies. Defaults to 10000.0.
+        max_relative_position (int, optional): Max relative position for relative embeddings. Defaults to 128.
+        use_sliding_window (bool, optional): Enable sliding window attention. Defaults to False.
+        sliding_window_size (int, optional): Sliding window size. Defaults to None.
+        qk_norm (bool, optional): Normalize queries and keys. Defaults to False.
+        qk_norm_type (str, optional): Normalization type ('rmsnorm' or 'layernorm'). Defaults to 'rmsnorm'.
+        use_triton_norm (bool, optional): Use Triton for normalization. Defaults to True.
+        use_triton_embeddings (bool, optional): Use Triton for position embeddings. Defaults to True.
+        kdim (int, optional): Key dimension (for cross-attention). If None, uses embed_dim. Defaults to None.
+        vdim (int, optional): Value dimension (for cross-attention). If None, uses embed_dim. Defaults to None.
+        add_zero_attn (bool, optional): Add zero attention token. Defaults to False.
+        batch_first (bool, optional): If True, input shape is (batch, seq, feature). Defaults to True.
+
+    Examples:
+        >>> # Self-attention
+        >>> attn = FastMultiHeadAttention(embed_dim=768, num_heads=12)
+        >>> x = torch.randn(4, 128, 768)
+        >>> output = attn(x)  # query=key=value=x
+
+        >>> # Cross-attention (encoder-decoder)
+        >>> attn = FastMultiHeadAttention(embed_dim=768, num_heads=12, kdim=512, vdim=512)
+        >>> query = torch.randn(4, 64, 768)  # decoder
+        >>> key = value = torch.randn(4, 128, 512)  # encoder
+        >>> output = attn(query, key, value)
+    """
+
     def __init__(
         self,
         embed_dim: int,

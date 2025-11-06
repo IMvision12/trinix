@@ -110,7 +110,7 @@ class TritonLionKernel:
 
     Provides a high-level interface for applying fused Lion optimization steps using Triton kernels.
     Lion (EvoLved Sign Momentum) uses sign-based updates with momentum, requiring only first-order
-    moments (no second moment like Adam/AdamW). This class automatically selects the appropriate 
+    moments (no second moment like Adam/AdamW). This class automatically selects the appropriate
     kernel based on whether gradient scaling is needed.
 
     Methods:
@@ -119,7 +119,7 @@ class TritonLionKernel:
 
         apply(params, grads, exp_avg, lr, beta1, beta2, weight_decay, grad_scale=1.0):
             Applies a fused Lion optimization step to update parameters in-place.
-            
+
             Parameters:
                 params (torch.Tensor): Parameter tensor to update (must be CUDA tensor).
                 grads (torch.Tensor): Gradient tensor.
@@ -128,11 +128,11 @@ class TritonLionKernel:
                 beta1 (float): Interpolation parameter for momentum computation (typically 0.9).
                 beta2 (float): Exponential decay rate for momentum update (typically 0.99).
                 weight_decay (float): Weight decay coefficient.
-                grad_scale (float, optional): Gradient scaling factor for mixed precision training. 
+                grad_scale (float, optional): Gradient scaling factor for mixed precision training.
                     Defaults to 1.0. When not 1.0, uses the gradient scaling kernel variant.
-            
-            The method automatically selects the appropriate kernel (with or without gradient 
-            scaling) based on the grad_scale parameter. Unlike Adam/AdamW, Lion does not use 
+
+            The method automatically selects the appropriate kernel (with or without gradient
+            scaling) based on the grad_scale parameter. Unlike Adam/AdamW, Lion does not use
             bias correction or second moment estimates.
     """
 

@@ -24,6 +24,88 @@ except ImportError:
 
 
 class FastBaseAttention(nn.Module):
+    """Fast base attention layer with multiple backend and position encoding options.
+
+    A flexible attention implementation that supports multiple computational backends
+    (Flash Attention, Triton, PyTorch) and various position encoding methods (RoPE, ALiBi,
+    Relative). Automatically selects the best available backend and provides extensive
+    configuration options for different attention patterns.
+
+    Args:
+        embed_dim (int): Total dimension of the model (must be divisible by num_heads).
+        num_heads (int): Number of parallel attention heads.
+        dropout (float, optional): Dropout probability for attention weights. Defaults to 0.0.
+        bias (bool, optional): Whether to use bias in projections. Defaults to True.
+        kernel_type (str, optional): Attention backend to use. Options: 'flash', 'triton', 'pytorch'.
+            Defaults to 'flash'. Falls back to PyTorch if selected backend is unavailable.
+        causal (bool, optional): Whether to apply causal masking (for autoregressive models).
+            Defaults to False.
+        position_method (str or nn.Module, optional): Position encoding method. Options:
+            - 'rope': Rotary Position Embedding
+            - 'alibi': Attention with Linear Biases
+            - 'relative': Learned relative position embeddings
+            - 'none': No position encoding
+            - Custom nn.Module for custom position encoding
+            Defaults to 'none'.
+        max_seq_len (int, optional): Maximum sequence length for position encodings.
+            Defaults to 2048.
+        rope_base (float, optional): Base for RoPE frequency computation. Defaults to 10000.0.
+        max_relative_position (int, optional): Maximum relative position for relative embeddings.
+            Defaults to 128.
+        use_sliding_window (bool, optional): Whether to use sliding window attention.
+            Defaults to False.
+        sliding_window_size (int, optional): Size of the sliding window. Required if
+            use_sliding_window is True. Defaults to None.
+        qk_norm (bool, optional): Whether to normalize queries and keys before attention.
+            Helps stabilize training. Defaults to False.
+        qk_norm_type (str, optional): Type of normalization for Q/K. Options: 'rmsnorm', 'layernorm'.
+            Defaults to 'rmsnorm'.
+        use_triton_norm (bool, optional): Whether to use Triton kernels for Q/K normalization.
+            Defaults to True.
+        use_triton_embeddings (bool, optional): Whether to use Triton kernels for position embeddings.
+            Defaults to True.
+        add_zero_attn (bool, optional): Whether to add a zero attention token (useful for padding).
+            Defaults to False.
+
+    Shape:
+        - q: (batch_size, seq_len, num_heads, head_dim)
+        - k: (batch_size, seq_len_k, num_heads, head_dim)
+        - v: (batch_size, seq_len_k, num_heads, head_dim)
+        - output: (batch_size, seq_len, num_heads, head_dim)
+
+    Examples:
+        >>> # Standard multi-head attention with Flash Attention
+        >>> attn = FastBaseAttention(embed_dim=768, num_heads=12)
+        >>> q = k = v = torch.randn(4, 128, 12, 64)  # (batch, seq_len, heads, head_dim)
+        >>> output = attn.forward_attention(q, k, v)
+
+        >>> # Causal attention with RoPE (for GPT-style models)
+        >>> attn = FastBaseAttention(
+        ...     embed_dim=768, num_heads=12, causal=True,
+        ...     position_method='rope', kernel_type='flash'
+        ... )
+
+        >>> # Attention with ALiBi and sliding window
+        >>> attn = FastBaseAttention(
+        ...     embed_dim=768, num_heads=12,
+        ...     position_method='alibi',
+        ...     use_sliding_window=True,
+        ...     sliding_window_size=256
+        ... )
+
+        >>> # With Q/K normalization for training stability
+        >>> attn = FastBaseAttention(
+        ...     embed_dim=768, num_heads=12,
+        ...     qk_norm=True, qk_norm_type='rmsnorm'
+        ... )
+
+    Notes:
+        - Flash Attention requires fp16 or bf16 tensors and doesn't support custom masks
+        - Triton backend supports all features including custom masks and position encodings
+        - PyTorch backend is the most compatible but may be slower
+        - The layer automatically falls back to available backends if the requested one is unavailable
+    """
+
     def __init__(
         self,
         embed_dim: int,

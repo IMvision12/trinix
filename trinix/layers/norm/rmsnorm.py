@@ -5,6 +5,32 @@ from ...kernels import TritonRMSNormKernel
 
 
 class FastRMSNorm(nn.Module):
+    """Fast RMS Normalization with automatic Triton/PyTorch backend selection.
+
+    RMS Normalization is a simpler alternative to Layer Normalization that normalizes using
+    only the root mean square (RMS) without centering (no mean subtraction). This makes it
+    computationally more efficient while maintaining similar performance.
+    Automatically uses Triton kernels for large tensors (hidden_size >= 2048) when available,
+    falling back to PyTorch implementation otherwise.
+
+    Args:
+        hidden_size (int): Size of the hidden dimension to normalize.
+        eps (float, optional): Small constant for numerical stability. Defaults to 1e-6.
+        use_triton (bool, optional): Whether to enable Triton kernels. Defaults to True.
+
+    Shape:
+        - Input: (*, hidden_size) where * means any number of dimensions
+        - Output: (*, hidden_size) same shape as input
+
+    Examples:
+        >>> rms_norm = FastRMSNorm(hidden_size=768)
+        >>> x = torch.randn(32, 128, 768)  # (batch, seq_len, hidden_size)
+        >>> output = rms_norm(x)  # shape: (32, 128, 768)
+
+        >>> # RMSNorm is commonly used in modern LLMs like LLaMA
+        >>> rms_norm = FastRMSNorm(4096, eps=1e-5)
+    """
+
     def __init__(
         self,
         hidden_size: int,

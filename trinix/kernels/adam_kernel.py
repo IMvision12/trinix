@@ -158,7 +158,7 @@ class TritonAdamKernel:
 
         apply(params, grads, exp_avg, exp_avg_sq, lr, beta1, beta2, eps, weight_decay, step, grad_scale=1.0):
             Applies a fused Adam optimization step to update parameters in-place.
-            
+
             Parameters:
                 params (torch.Tensor): Parameter tensor to update (must be CUDA tensor).
                 grads (torch.Tensor): Gradient tensor.
@@ -170,9 +170,9 @@ class TritonAdamKernel:
                 eps (float): Small constant for numerical stability (typically 1e-8).
                 weight_decay (float): Weight decay coefficient (L2 penalty).
                 step (int): Current optimization step number (1-indexed).
-                grad_scale (float, optional): Gradient scaling factor for mixed precision training. 
+                grad_scale (float, optional): Gradient scaling factor for mixed precision training.
                     Defaults to 1.0. When not 1.0, uses the gradient scaling kernel variant.
-            
+
             The method automatically computes bias corrections and selects the appropriate kernel
             (with or without gradient scaling) based on the grad_scale parameter.
     """

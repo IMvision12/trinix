@@ -6,9 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "trinix"
 dynamic = ["version"]
 description = "High-performance PyTorch layers with optimized Triton kernels and Flash Attention support"
-authors = [
-    { name = "Gitesh" }
-]
+authors = [{ name = "Gitesh Chawda", email = "gitesh.ch.0912@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.9,<3.14"
 license = "Apache-2.0"
@@ -32,6 +30,14 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["trinix"]
+
+[tool.ruff.lint]
+ignore = ["C901", "E501", "E741", "F402", "F823"]
+select = ["C", "E", "F", "I", "W"]
+
+# Ignore specific linting errors for ALL __init__.py files
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403", "F811"]
 
 [project.urls]
 documentation = "https://github.com/IMvision12/trinix"

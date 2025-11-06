@@ -5,6 +5,26 @@ from ...kernels import TritonQuickGELUKernel
 
 
 class FastQuickGELU(nn.Module):
+    """Fast QuickGELU activation layer with automatic Triton/PyTorch backend selection.
+
+    QuickGELU is a faster approximation of GELU: x * sigmoid(1.702 * x).
+    Automatically uses Triton kernels for large tensors (hidden_size >= 512) when available,
+    falling back to PyTorch implementation otherwise.
+
+    Args:
+        hidden_size (int): Size of the hidden dimension. Used to determine whether to use Triton.
+        use_triton (bool, optional): Whether to enable Triton kernels. Defaults to True.
+
+    Shape:
+        - Input: (*, hidden_size) where * means any number of dimensions
+        - Output: (*, hidden_size)
+
+    Examples:
+        >>> layer = FastQuickGELU(hidden_size=1024)
+        >>> x = torch.randn(32, 1024)
+        >>> output = layer(x)  # shape: (32, 1024)
+    """
+
     def __init__(
         self,
         hidden_size: int,

@@ -12,6 +12,17 @@ def mish_forward_kernel(
     n_elements: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Mish activation forward kernel.
+
+    Computes Mish activation: x * tanh(softplus(x)) = x * tanh(ln(1 + exp(x))).
+    Mish is a smooth, non-monotonic activation function.
+
+    Args:
+        Y_ptr: Pointer to output tensor.
+        X_ptr: Pointer to input tensor.
+        n_elements: Total number of elements in the tensor.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -33,6 +44,17 @@ def mish_backward_kernel(
     n_elements: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
+    """Mish activation backward kernel.
+
+    Computes gradient of Mish activation with respect to input.
+
+    Args:
+        dX_ptr: Pointer to input gradient tensor.
+        dY_ptr: Pointer to output gradient tensor.
+        X_ptr: Pointer to input tensor from forward pass.
+        n_elements: Total number of elements in the tensor.
+        BLOCK_SIZE: Triton block size for parallel processing.
+    """
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
@@ -55,6 +77,32 @@ def mish_backward_kernel(
 
 
 class TritonMishFunction(torch.autograd.Function):
+    """Autograd function for Mish activation.
+
+    This function wraps the Mish kernel for automatic differentiation.
+
+    Methods:
+        forward(ctx, X):
+            Computes Mish activation: x * tanh(softplus(x)).
+
+            Parameters:
+                ctx: Autograd context for saving tensors needed in backward pass.
+                X (torch.Tensor): Input tensor of any shape.
+
+            Returns:
+                torch.Tensor: Output tensor with Mish activation applied, same shape as input.
+
+        backward(ctx, dY):
+            Backward pass for Mish activation.
+
+            Parameters:
+                ctx: Autograd context containing saved input tensor.
+                dY: Gradient of loss with respect to the output.
+
+            Returns:
+                torch.Tensor: Gradient of loss with respect to the input.
+    """
+
     @staticmethod
     def forward(ctx, X):
         shape = X.shape
@@ -100,6 +148,27 @@ class TritonMishFunction(torch.autograd.Function):
 
 
 class TritonMishKernel:
+    """Triton-accelerated Mish activation kernel wrapper.
+
+    Provides a high-level interface for applying Mish activation function,
+    which is a smooth, non-monotonic activation: x * tanh(softplus(x)).
+
+    Methods:
+        is_available(): Checks if Triton and CUDA are available for kernel execution.
+            Returns True if both Triton is installed and CUDA is available, False otherwise.
+
+        apply(X):
+            Applies Mish activation to the input tensor.
+
+            Parameters:
+                X (torch.Tensor): Input tensor of any shape.
+
+            Returns:
+                torch.Tensor: Output tensor with Mish activation applied, same shape as input.
+                    Computed as: x * tanh(ln(1 + exp(x))).
+                    Mish is a smooth, self-regularized non-monotonic activation function.
+    """
+
     @staticmethod
     def is_available() -> bool:
         try:
