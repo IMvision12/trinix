@@ -27,8 +27,8 @@ dependencies = [
     "numpy",
 ]
 
-[tool.setuptools]
-packages = ["trinix"]
+[tool.setuptools.packages.find]
+include = ["trinix*"]
 
 [tool.ruff.lint]
 ignore = ["C901", "E501", "E741", "F402", "F823"]
