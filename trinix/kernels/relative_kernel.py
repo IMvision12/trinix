@@ -49,24 +49,36 @@ def relative_pos_bias_kernel(
         stride_out_dim: Stride for embedding dimension in output.
         BLOCK_SIZE_DIM: Triton block size for embedding dimension.
     """
-    batch_idx = tl.program_id(0)
-    head_idx = tl.program_id(1)
-    i_idx = tl.program_id(2)
-    for j_idx in range(seq_len):
-        pos_idx = tl.load(positions_ptr + i_idx * stride_pos_i + j_idx * stride_pos_j)
-        dim_offsets = tl.arange(0, BLOCK_SIZE_DIM)
-        dim_mask = dim_offsets < head_dim
-        emb_offset = pos_idx * stride_emb_vocab
-        emb_ptrs = embeddings_ptr + emb_offset + dim_offsets * stride_emb_dim
-        emb_values = tl.load(emb_ptrs, mask=dim_mask, other=0.0)
-        out_offset = (
-            batch_idx * stride_out_batch
-            + head_idx * stride_out_head
-            + i_idx * stride_out_i
-            + j_idx * stride_out_j
-        )
-        out_ptrs = output_ptr + out_offset + dim_offsets * stride_out_dim
-        tl.store(out_ptrs, emb_values, mask=dim_mask)
+    pid = tl.program_id(0)
+    
+    total_positions = batch_size * num_heads * seq_len * seq_len
+    if pid >= total_positions:
+        return
+    
+    j_idx = pid % seq_len
+    temp = pid // seq_len
+    i_idx = temp % seq_len
+    temp = temp // seq_len
+    head_idx = temp % num_heads
+    batch_idx = temp // num_heads
+    
+    pos_ptr = positions_ptr + i_idx * stride_pos_i + j_idx * stride_pos_j
+    pos_idx = tl.load(pos_ptr)
+    
+    dim_offsets = tl.arange(0, BLOCK_SIZE_DIM)
+    dim_mask = dim_offsets < head_dim
+    
+    emb_ptrs = embeddings_ptr + pos_idx * stride_emb_vocab + dim_offsets * stride_emb_dim
+    emb_values = tl.load(emb_ptrs, mask=dim_mask, other=0.0)
+    
+    out_offset = (
+        batch_idx * stride_out_batch
+        + head_idx * stride_out_head
+        + i_idx * stride_out_i
+        + j_idx * stride_out_j
+    )
+    out_ptrs = output_ptr + out_offset + dim_offsets * stride_out_dim
+    tl.store(out_ptrs, emb_values, mask=dim_mask)
 
 
 class TritonRelativeFunction(torch.autograd.Function):
@@ -114,7 +126,8 @@ class TritonRelativeFunction(torch.autograd.Function):
             dtype=embeddings.dtype,
         )
         BLOCK_SIZE_DIM, num_warps = calculate_triton_kernel_configuration(head_dim)
-        grid = (batch_size, num_heads, seq_len)
+        total_programs = batch_size * num_heads * seq_len * seq_len
+        grid = (total_programs,)
         relative_pos_bias_kernel[grid](
             embeddings,
             positions,
