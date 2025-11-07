@@ -17,7 +17,8 @@ class FastRoPEPositionEmbedding(nn.Module):
 
     RoPE encodes position information by rotating pairs of features using position-dependent
     rotation matrices. This allows the model to naturally incorporate relative position information
-    without adding extra parameters. Automatically uses Triton kernels when available.
+    without adding extra parameters. Automatically uses Triton kernels for larger models (hidden_size > 2048)
+    with sufficient sequence length (seq_len > 512), falling back to PyTorch otherwise.
 
     Args:
         dim (int): Dimension of the embeddings (typically head_dim).
@@ -70,6 +71,25 @@ class FastRoPEPositionEmbedding(nn.Module):
         sin = emb.sin().to(x.dtype)
         return (cos, sin)
 
+    def _check_triton_availability(self, q: torch.Tensor) -> bool:
+        """Check if Triton should be used based on model size and sequence length."""
+        if not self.use_triton or not TRITON_AVAILABLE:
+            return False
+        if TritonRoPEKernel is None or not TritonRoPEKernel.is_available():
+            return False
+        if not q.is_cuda:
+            return False
+        # q shape: (batch, seq_len, num_heads, head_dim)
+        # Triton is faster for larger models (hidden > 2048) with longer sequences (seq_len > 512)
+        if q.dim() >= 3:
+            seq_len = q.shape[1]
+            num_heads = q.shape[2]
+            head_dim = q.shape[3]
+            hidden_size = num_heads * head_dim
+            # Use Triton when BOTH conditions are met
+            return hidden_size > 2048 and seq_len > 512
+        return False
+
     def apply_rotary_pos_emb(
         self,
         q: torch.Tensor,
@@ -78,17 +98,10 @@ class FastRoPEPositionEmbedding(nn.Module):
         sin: torch.Tensor,
         position_ids: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        if (
-            self.use_triton
-            and TRITON_AVAILABLE
-            and (TritonRoPEKernel is not None)
-            and TritonRoPEKernel.is_available()
-            and q.is_cuda
-            and (position_ids is None)
-        ):
-            return TritonRoPEKernel.apply(q, k, cos, sin)
-        elif position_ids is not None:
+        if position_ids is not None:
             return self._apply_rope_with_position_ids(q, k, cos, sin, position_ids)
+        elif self._check_triton_availability(q):
+            return TritonRoPEKernel.apply(q, k, cos, sin)
         else:
             return self._apply_rope_pytorch(q, k, cos, sin)
 
