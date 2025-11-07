@@ -3,7 +3,6 @@ from .kernels import (
     TritonALiBiKernel,
     TritonGeGLUKernel,
     TritonLayerNormKernel,
-    TritonRelativeKernel,
     TritonRMSNormKernel,
     TritonRoPEKernel,
     TritonSwiGLUKernel,
@@ -28,7 +27,6 @@ from .layers.attention import (
 )
 from .layers.embeddings import (
     FastALiBiPositionEmbedding,
-    FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
 from .layers.norm import FastLayerNorm, FastRMSNorm
@@ -41,7 +39,6 @@ __all__ = [
     "FastMultiHeadSelfAttention",
     "FastRoPEPositionEmbedding",
     "FastALiBiPositionEmbedding",
-    "FastRelativePositionEmbedding",
     "FastLayerNorm",
     "FastRMSNorm",
     "FastSwiGLU",
@@ -50,7 +47,6 @@ __all__ = [
     "TritonAdamWKernel",
     "TritonRoPEKernel",
     "TritonALiBiKernel",
-    "TritonRelativeKernel",
     "TritonLayerNormKernel",
     "TritonRMSNormKernel",
     "TritonSwiGLUKernel",

@@ -9,7 +9,6 @@ from .attention import (
 )
 from .embeddings import (
     FastALiBiPositionEmbedding,
-    FastRelativePositionEmbedding,
     FastRoPEPositionEmbedding,
 )
 from .norm import FastLayerNorm, FastRMSNorm
@@ -26,7 +25,6 @@ __all__ = [
     "FastMultiHeadLatentAttention",
     "FastRoPEPositionEmbedding",
     "FastALiBiPositionEmbedding",
-    "FastRelativePositionEmbedding",
     "FastLayerNorm",
     "FastRMSNorm",
     "FastSwiGLU",
