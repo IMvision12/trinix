@@ -13,12 +13,15 @@ except (ImportError, ModuleNotFoundError):
 
 
 class FastRoPEPositionEmbedding(nn.Module):
-    """Fast RoPE (Rotary Position Embedding) layer.
+    """Fast RoPE (Rotary Position Embedding) layer with automatic backend selection.
 
     RoPE encodes position information by rotating pairs of features using position-dependent
     rotation matrices. This allows the model to naturally incorporate relative position information
-    without adding extra parameters. Automatically uses Triton kernels for larger models (hidden_size > 2048)
-    with sufficient sequence length (seq_len > 512), falling back to PyTorch otherwise.
+    without adding extra parameters.
+
+    Automatically selects the optimal backend:
+    - Triton: For larger models (hidden_size > 2048) with longer sequences (seq_len > 512)
+    - PyTorch: For smaller models or shorter sequences where PyTorch is faster
 
     Args:
         dim (int): Dimension of the embeddings (typically head_dim).
@@ -33,10 +36,14 @@ class FastRoPEPositionEmbedding(nn.Module):
 
     Examples:
         >>> rope = FastRoPEPositionEmbedding(dim=64)
-        >>> q = torch.randn(4, 128, 8, 64)  # (batch, seq_len, num_heads, head_dim)
-        >>> k = torch.randn(4, 128, 8, 64)
-        >>> cos, sin = rope(q, seq_len=128)
+        >>> q = torch.randn(4, 1024, 8, 64)  # (batch, seq_len, num_heads, head_dim)
+        >>> k = torch.randn(4, 1024, 8, 64)
+        >>> cos, sin = rope(q, seq_len=1024)
         >>> q_rot, k_rot = rope.apply_rotary_pos_emb(q, k, cos, sin)
+
+    Note:
+        Backend selection is automatic based on tensor shape. For models with
+        hidden_size ≤ 2048 or seq_len ≤ 512, PyTorch backend is used for optimal performance.
     """
 
     def __init__(
@@ -72,21 +79,17 @@ class FastRoPEPositionEmbedding(nn.Module):
         return (cos, sin)
 
     def _check_triton_availability(self, q: torch.Tensor) -> bool:
-        """Check if Triton should be used based on model size and sequence length."""
         if not self.use_triton or not TRITON_AVAILABLE:
             return False
         if TritonRoPEKernel is None or not TritonRoPEKernel.is_available():
             return False
         if not q.is_cuda:
             return False
-        # q shape: (batch, seq_len, num_heads, head_dim)
-        # Triton is faster for larger models (hidden > 2048) with longer sequences (seq_len > 512)
         if q.dim() >= 3:
             seq_len = q.shape[1]
             num_heads = q.shape[2]
             head_dim = q.shape[3]
             hidden_size = num_heads * head_dim
-            # Use Triton when BOTH conditions are met
             return hidden_size > 2048 and seq_len > 512
         return False
 
