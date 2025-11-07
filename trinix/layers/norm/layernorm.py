@@ -9,7 +9,7 @@ class FastLayerNorm(nn.Module):
 
     Layer Normalization normalizes inputs across the feature dimension by subtracting the mean
     and dividing by the standard deviation, then applies learned affine transformation.
-    Automatically uses Triton kernels for large tensors (hidden_size >= 2048) when available,
+    Automatically uses Triton kernels for large tensors (hidden_size >= 4096) when available,
     falling back to PyTorch's native implementation otherwise.
 
     Args:
@@ -66,7 +66,7 @@ class FastLayerNorm(nn.Module):
         if len(self.normalized_shape) != 1:
             return False
         hidden_size = self.normalized_shape[0]
-        return hidden_size >= 2048
+        return hidden_size >= 4096
 
     def _reshape_for_triton(self, input: torch.Tensor):
         original_shape = input.shape
