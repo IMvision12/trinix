@@ -18,7 +18,6 @@ if TRITON_AVAILABLE:
     from .mish_kernel import TritonMishKernel
     from .quickgelu_kernel import TritonQuickGELUKernel
     from .reglu_kernel import TritonReGLUKernel
-    from .relative_kernel import TritonRelativeKernel
     from .rmsnorm_kernel import TritonRMSNormKernel
     from .rope_kernel import TritonRoPEKernel
     from .squared_relu_kernel import TritonSquaredReLUKernel
@@ -35,7 +34,6 @@ if TRITON_AVAILABLE:
         "TritonLionKernel",
         "TritonRoPEKernel",
         "TritonALiBiKernel",
-        "TritonRelativeKernel",
         "TritonLayerNormKernel",
         "TritonLayerNormFunction",
         "TritonRMSNormKernel",
@@ -64,11 +62,6 @@ else:
             return False
 
     class TritonALiBiKernel:
-        @staticmethod
-        def is_available():
-            return False
-
-    class TritonRelativeKernel:
         @staticmethod
         def is_available():
             return False
@@ -128,7 +121,6 @@ else:
         "TritonLionKernel",
         "TritonRoPEKernel",
         "TritonALiBiKernel",
-        "TritonRelativeKernel",
         "TritonLayerNormKernel",
         "TritonRMSNormKernel",
         "TritonSwiGLUKernel",

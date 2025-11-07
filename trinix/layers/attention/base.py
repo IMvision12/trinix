@@ -27,8 +27,8 @@ class FastBaseAttention(nn.Module):
     """Fast base attention layer with multiple backend and position encoding options.
 
     A flexible attention implementation that supports multiple computational backends
-    (Flash Attention, Triton, PyTorch) and various position encoding methods (RoPE, ALiBi,
-    Relative). Automatically selects the best available backend and provides extensive
+    (Flash Attention, Triton, PyTorch) and various position encoding methods (RoPE, ALiBi).
+    Automatically selects the best available backend and provides extensive
     configuration options for different attention patterns.
 
     Args:
@@ -43,15 +43,12 @@ class FastBaseAttention(nn.Module):
         position_method (str or nn.Module, optional): Position encoding method. Options:
             - 'rope': Rotary Position Embedding
             - 'alibi': Attention with Linear Biases
-            - 'relative': Learned relative position embeddings
             - 'none': No position encoding
             - Custom nn.Module for custom position encoding
             Defaults to 'none'.
         max_seq_len (int, optional): Maximum sequence length for position encodings.
             Defaults to 2048.
         rope_base (float, optional): Base for RoPE frequency computation. Defaults to 10000.0.
-        max_relative_position (int, optional): Maximum relative position for relative embeddings.
-            Defaults to 128.
         use_sliding_window (bool, optional): Whether to use sliding window attention.
             Defaults to False.
         sliding_window_size (int, optional): Size of the sliding window. Required if
@@ -117,7 +114,6 @@ class FastBaseAttention(nn.Module):
         position_method: Union[str, nn.Module] = "none",
         max_seq_len: int = 2048,
         rope_base: float = 10000.0,
-        max_relative_position: int = 128,
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
         qk_norm: bool = False,
@@ -161,7 +157,6 @@ class FastBaseAttention(nn.Module):
             position_method,
             max_seq_len,
             rope_base,
-            max_relative_position,
             use_triton_embeddings,
         )
 
@@ -185,10 +180,9 @@ class FastBaseAttention(nn.Module):
             assert position_method in [
                 "rope",
                 "alibi",
-                "relative",
                 "none",
             ] or position_method.startswith("custom"), (
-                f"Invalid position_method: {position_method}. Use 'rope', 'alibi', 'relative', 'none', or provide a custom nn.Module."
+                f"Invalid position_method: {position_method}. Use 'rope', 'alibi', 'none', or provide a custom nn.Module."
             )
         elif not isinstance(position_method, nn.Module):
             raise TypeError(
@@ -200,12 +194,10 @@ class FastBaseAttention(nn.Module):
         position_method: Union[str, nn.Module],
         max_seq_len: int,
         rope_base: float,
-        max_relative_position: int,
         use_triton_embeddings: bool,
     ):
         from ..embeddings import (
             FastALiBiPositionEmbedding,
-            FastRelativePositionEmbedding,
             FastRoPEPositionEmbedding,
         )
 
@@ -222,13 +214,6 @@ class FastBaseAttention(nn.Module):
             self.position_embedding = FastALiBiPositionEmbedding(
                 num_heads=self.num_heads,
                 max_seq_len=max_seq_len,
-                use_triton=use_triton_embeddings,
-            )
-        elif position_method == "relative":
-            self.position_embedding = FastRelativePositionEmbedding(
-                num_heads=self.num_heads,
-                head_dim=self.head_dim,
-                max_relative_position=max_relative_position,
                 use_triton=use_triton_embeddings,
             )
         else:
@@ -274,10 +259,6 @@ class FastBaseAttention(nn.Module):
                 q, k, cos, sin, position_ids
             )
         elif self.position_method == "alibi" and self.position_embedding is not None:
-            position_bias = self.position_embedding(max_seq_len, batch_size)
-            if seq_len_q != seq_len_k:
-                position_bias = position_bias[:, :, :seq_len_q, :seq_len_k]
-        elif self.position_method == "relative" and self.position_embedding is not None:
             position_bias = self.position_embedding(max_seq_len, batch_size)
             if seq_len_q != seq_len_k:
                 position_bias = position_bias[:, :, :seq_len_q, :seq_len_k]

@@ -25,7 +25,6 @@ class FastMultiQueryAttention(FastBaseAttention):
         position_method (str or nn.Module, optional): Position encoding method. Defaults to 'none'.
         max_seq_len (int, optional): Maximum sequence length. Defaults to 2048.
         rope_base (float, optional): Base for RoPE frequencies. Defaults to 10000.0.
-        max_relative_position (int, optional): Max relative position for relative embeddings. Defaults to 128.
         use_sliding_window (bool, optional): Enable sliding window attention. Defaults to False.
         sliding_window_size (int, optional): Sliding window size. Defaults to None.
         qk_norm (bool, optional): Normalize queries and keys. Defaults to False.
@@ -65,7 +64,6 @@ class FastMultiQueryAttention(FastBaseAttention):
         position_method: Union[str, nn.Module] = "none",
         max_seq_len: int = 2048,
         rope_base: float = 10000.0,
-        max_relative_position: int = 128,
         use_sliding_window: bool = False,
         sliding_window_size: Optional[int] = None,
         qk_norm: bool = False,
@@ -85,7 +83,6 @@ class FastMultiQueryAttention(FastBaseAttention):
                 position_method,
                 max_seq_len,
                 rope_base,
-                max_relative_position,
                 use_sliding_window,
                 sliding_window_size,
                 qk_norm,
@@ -106,7 +103,6 @@ class FastMultiQueryAttention(FastBaseAttention):
                 position_method,
                 max_seq_len,
                 rope_base,
-                max_relative_position,
                 use_sliding_window,
                 sliding_window_size,
                 qk_norm,
