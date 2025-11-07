@@ -10,7 +10,7 @@ class FastRMSNorm(nn.Module):
     RMS Normalization is a simpler alternative to Layer Normalization that normalizes using
     only the root mean square (RMS) without centering (no mean subtraction). This makes it
     computationally more efficient while maintaining similar performance.
-    Automatically uses Triton kernels for large tensors (hidden_size >= 2048) when available,
+    Automatically uses Triton kernels for large tensors (hidden_size > 2048) when available,
     falling back to PyTorch implementation otherwise.
 
     Args:
@@ -49,7 +49,7 @@ class FastRMSNorm(nn.Module):
             return False
         if not TritonRMSNormKernel.is_available():
             return False
-        return self.hidden_size >= 2048
+        return self.hidden_size > 2048
 
     def _reshape_for_triton(self, hidden_states: torch.Tensor):
         original_shape = hidden_states.shape
@@ -87,4 +87,5 @@ class FastRMSNorm(nn.Module):
             return self._pytorch_forward(hidden_states)
 
     def extra_repr(self) -> str:
-        return f"hidden_size={self.hidden_size}, eps={self.eps}, use_triton={self.use_triton}"
+        backend = "triton" if self._check_triton_availability() else "pytorch"
+        return f"hidden_size={self.hidden_size}, eps={self.eps}, backend={backend}"

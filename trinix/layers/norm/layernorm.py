@@ -9,7 +9,7 @@ class FastLayerNorm(nn.Module):
 
     Layer Normalization normalizes inputs across the feature dimension by subtracting the mean
     and dividing by the standard deviation, then applies learned affine transformation.
-    Automatically uses Triton kernels for large tensors (hidden_size >= 4096) when available,
+    Automatically uses Triton kernels for large tensors (hidden_size > 4096) when available,
     falling back to PyTorch's native implementation otherwise.
 
     Args:
@@ -99,4 +99,5 @@ class FastLayerNorm(nn.Module):
             return self._pytorch_forward(input)
 
     def extra_repr(self) -> str:
-        return f"{self.normalized_shape}, eps={self.eps}, elementwise_affine={self.elementwise_affine}, use_triton={self.use_triton}"
+        backend = "triton" if self._check_triton_availability() else "pytorch"
+        return f"{self.normalized_shape}, eps={self.eps}, elementwise_affine={self.elementwise_affine}, backend={backend}"

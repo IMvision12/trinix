@@ -50,9 +50,9 @@ class FastRelativePositionEmbedding(nn.Module):
             2 * max_relative_position + 1, head_dim
         )
 
-    def _get_relative_positions(self, seq_len: int) -> torch.Tensor:
-        positions = torch.arange(seq_len).unsqueeze(0) - torch.arange(
-            seq_len
+    def _get_relative_positions(self, seq_len: int, device: torch.device) -> torch.Tensor:
+        positions = torch.arange(seq_len, device=device).unsqueeze(0) - torch.arange(
+            seq_len, device=device
         ).unsqueeze(1)
         positions = torch.clamp(
             positions, -self.max_relative_position, self.max_relative_position
@@ -61,7 +61,8 @@ class FastRelativePositionEmbedding(nn.Module):
         return positions
 
     def forward(self, seq_len: int, batch_size: int = 1) -> torch.Tensor:
-        relative_positions = self._get_relative_positions(seq_len)
+        device = self.relative_position_embeddings.weight.device
+        relative_positions = self._get_relative_positions(seq_len, device)
         if (
             self.use_triton
             and TRITON_AVAILABLE
