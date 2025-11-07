@@ -57,16 +57,16 @@ def relative_pos_bias_kernel(
         dim_offsets = tl.arange(0, BLOCK_SIZE_DIM)
         dim_mask = dim_offsets < head_dim
         emb_offset = pos_idx * stride_emb_vocab
-        emb_values = tl.load(
-            embeddings_ptr + emb_offset + dim_offsets, mask=dim_mask, other=0.0
-        )
+        emb_ptrs = embeddings_ptr + emb_offset + dim_offsets * stride_emb_dim
+        emb_values = tl.load(emb_ptrs, mask=dim_mask, other=0.0)
         out_offset = (
             batch_idx * stride_out_batch
             + head_idx * stride_out_head
             + i_idx * stride_out_i
             + j_idx * stride_out_j
         )
-        tl.store(output_ptr + out_offset + dim_offsets, emb_values, mask=dim_mask)
+        out_ptrs = output_ptr + out_offset + dim_offsets * stride_out_dim
+        tl.store(out_ptrs, emb_values, mask=dim_mask)
 
 
 class TritonRelativeFunction(torch.autograd.Function):
