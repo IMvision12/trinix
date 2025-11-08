@@ -259,19 +259,6 @@ class TritonLayerNormFunction(torch.autograd.Function):
             - N > 1024: GROUP_SIZE_M = 128
             - N ≤ 1024: GROUP_SIZE_M = 256
     
-    Performance Characteristics:
-        - 1.5-1.6x speedup over PyTorch for hidden_size > 4096
-        - Automatic block size selection based on GPU compute capability
-        - Adaptive lock group sizing reduces contention
-        - Memory efficient: minimal temporary allocations
-    
-    Benchmark Results (A100-80GB, FP16):
-        - S=4096, H=8192: 1.59x speedup (0.257ms → 0.162ms)
-        - S=16384, H=8192: 1.54x speedup (0.957ms → 0.621ms)
-        - S=131072, H=16384: 1.55x speedup (15.224ms → 9.852ms)
-    
-    This implementation follows Triton's official LayerNorm tutorial strategy
-    for optimal performance on modern GPUs (A100, H100).
     """
     
     @staticmethod
@@ -376,25 +363,6 @@ class TritonLayerNormKernel:
         Forward:  Y = (X - mean(X)) / sqrt(var(X) + eps) * W + b
         Backward: Two-stage parallel reduction with atomic locks
     
-    Performance:
-        - 1.5-1.6x speedup over PyTorch for hidden_size > 4096
-        - Optimal for: seq_len ≥ 4096, hidden_size ≥ 8192
-        - Automatic block size selection (64-16384 based on GPU)
-        - Adaptive lock group sizing for gradient accumulation
-    
-    Benchmark Results (A100-80GB, FP16):
-        Config: S=4096, H=8192  → 1.59x speedup (0.257ms → 0.162ms)
-        Config: S=16384, H=8192 → 1.54x speedup (0.957ms → 0.621ms)
-        Config: S=32768, H=12288 → 1.56x speedup (2.881ms → 1.852ms)
-        Config: S=131072, H=16384 → 1.55x speedup (15.224ms → 9.852ms)
-    
-    Implementation Details:
-        - Forward: Single kernel per row, computes mean/var/normalize/affine
-        - Backward Stage 1: Fused dX computation + partial dW/dB accumulation
-        - Backward Stage 2: Parallel reduction of partial gradients
-        - Lock Strategy: Atomic operations with configurable group size
-        - Memory: Minimal temporary allocations (only partial buffers)
-    
     Methods:
         is_available() -> bool:
             Check if Triton and CUDA are available.
@@ -435,11 +403,7 @@ class TritonLayerNormKernel:
         >>> W = torch.ones(8192, device='cuda', dtype=torch.float16)
         >>> b = torch.zeros(8192, device='cuda', dtype=torch.float16)
         >>> Y = TritonLayerNormKernel.apply(X, W, b, 1e-5)
-    
-    See Also:
-        - FastLayerNorm: High-level layer wrapper with automatic backend selection
-        - TritonRMSNormKernel: RMSNorm variant (3.7x speedup, recommended for LLMs)
-        - benchmarks/NORMALIZATION.md: Detailed performance analysis
+
     """
 
     @staticmethod
