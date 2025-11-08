@@ -395,16 +395,46 @@ class TritonLayerNormKernel:
         - Lock Strategy: Atomic operations with configurable group size
         - Memory: Minimal temporary allocations (only partial buffers)
     
+    Methods:
+        is_available() -> bool:
+            Check if Triton and CUDA are available.
+            Returns True if both are available, False otherwise.
+            Note: Even if available, kernel may not be used if hidden_size ≤ 4096.
+        
+        apply(X, W, b, eps) -> torch.Tensor:
+            Apply Layer Normalization with affine transformation.
+            
+            Args:
+                X: Input tensor of any shape (*, N)
+                W: Weight tensor, shape (N,) - learned scale parameter
+                b: Bias tensor, shape (N,) - learned shift parameter
+                eps: Small constant for numerical stability (typically 1e-5)
+            
+            Returns:
+                Normalized output with same shape as input
+            
+            Performance:
+                - Best for: hidden_size > 4096, seq_len ≥ 4096
+                - Speedup: 1.5-1.6x over PyTorch
+                - Memory: Minimal overhead (only mean/rstd buffers)
+            
+            Note:
+                - Supports automatic differentiation
+                - Uses two-stage parallel reduction for gradients
+                - Automatically selects optimal block size
+    
     Usage:
         >>> from trinix import FastLayerNorm
         >>> layer = FastLayerNorm(8192, use_triton=True)
         >>> x = torch.randn(4, 2048, 8192, device='cuda', dtype=torch.float16)
-        >>> output = layer(x)  # Automatically us
-        es Triton kernel
-    
-    Methods:
-        is_available(): Check if Triton and CUDA are available
-        apply(X, W, b, eps): Apply Layer Normalization with affine transformation
+        >>> output = layer(x)  # Automatically uses Triton kernel
+        
+        >>> # Or use kernel directly
+        >>> from trinix.kernels import TritonLayerNormKernel
+        >>> X = torch.randn(4, 2048, 8192, device='cuda', dtype=torch.float16)
+        >>> W = torch.ones(8192, device='cuda', dtype=torch.float16)
+        >>> b = torch.zeros(8192, device='cuda', dtype=torch.float16)
+        >>> Y = TritonLayerNormKernel.apply(X, W, b, 1e-5)
     
     See Also:
         - FastLayerNorm: High-level layer wrapper with automatic backend selection
@@ -414,15 +444,6 @@ class TritonLayerNormKernel:
 
     @staticmethod
     def is_available() -> bool:
-        """Check if Triton LayerNorm kernel is available.
-        
-        Returns:
-            bool: True if Triton is installed and CUDA is available, False otherwise.
-        
-        Note:
-            Even if available, the kernel may not be used if hidden_size ≤ 4096.
-            See FastLayerNorm._check_triton_availability() for activation logic.
-        """
         try:
             import triton
             return torch.cuda.is_available()
@@ -433,45 +454,4 @@ class TritonLayerNormKernel:
     def apply(
         X: torch.Tensor, W: torch.Tensor, b: torch.Tensor, eps: float
     ) -> torch.Tensor:
-        """Apply Layer Normalization with affine transformation using Triton kernel.
-        
-        Computes: Y = (X - mean(X)) / sqrt(var(X) + eps) * W + b
-        
-        Args:
-            X (torch.Tensor): Input tensor of any shape. Will be reshaped to 2D
-                internally (batch_size * seq_len, hidden_size).
-            W (torch.Tensor): Weight tensor for affine transformation, shape (N,)
-                where N is the last dimension of X. Learned scale parameter.
-            b (torch.Tensor): Bias tensor for affine transformation, shape (N,).
-                Learned shift parameter.
-            eps (float): Small constant for numerical stability, typically 1e-5.
-                Added to variance before taking square root.
-        
-        Returns:
-            torch.Tensor: Normalized output with same shape as input.
-        
-        Shape:
-            - Input: (*, N) where * means any number of dimensions
-            - Weight: (N,)
-            - Bias: (N,)
-            - Output: (*, N) same shape as input
-        
-        Performance:
-            - Best for: hidden_size > 4096, seq_len ≥ 4096
-            - Speedup: 1.5-1.6x over PyTorch
-            - Memory: Minimal overhead (only mean/rstd buffers)
-        
-        Example:
-            >>> X = torch.randn(4, 2048, 8192, device='cuda', dtype=torch.float16)
-            >>> W = torch.ones(8192, device='cuda', dtype=torch.float16)
-            >>> b = torch.zeros(8192, device='cuda', dtype=torch.float16)
-            >>> Y = TritonLayerNormKernel.apply(X, W, b, 1e-5)
-            >>> Y.shape
-            torch.Size([4, 2048, 8192])
-        
-        Note:
-            - Supports automatic differentiation (backward pass implemented)
-            - Uses two-stage parallel reduction for gradient computation
-            - Automatically selects optimal block size based on GPU architecture
-        """
         return TritonLayerNormFunction.apply(X, W, b, eps)
