@@ -1,4 +1,7 @@
+# Core dependencies (required)
 torch>=2.0.0
 numpy>=1.20.0
-triton>=2.0.0
-flash-attn>=2.0.0
+
+# Optional GPU dependencies (install with: pip install trinix[gpu])
+# triton>=2.0.0
+# flash-attn>=2.0.0

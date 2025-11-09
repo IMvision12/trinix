@@ -4,8 +4,10 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'trinix/version.py'
+    # Uncomment to only trigger on version.py changes:
+    # paths:
+    #   - 'trinix/version.py'
+  workflow_dispatch:  # Allows manual trigger from GitHub Actions tab
 
 jobs:
   create-release:
@@ -72,15 +74,15 @@ jobs:
           path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('requirements.txt') }}
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
-          pip install -r requirements.txt --progress-bar off --upgrade
-          pip install -e ".[tests]" --progress-bar off --upgrade
+          pip install --upgrade pip setuptools wheel twine build
+          # Install only core dependencies needed for building (not flash-attn/triton)
+          pip install torch>=2.0.0 numpy>=1.20.0 --progress-bar off
 
       - name: Build wheels
         shell: bash
         run: |
-          pip install --upgrade pip setuptools wheel twine build
           python -m build
 
       - name: Publish package distributions to PyPI

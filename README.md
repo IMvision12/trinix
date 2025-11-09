@@ -9,20 +9,34 @@ Trinix intelligently selects between Flash Attention, Triton kernels, and PyTorc
 **Requirements:**
 - Python >= 3.9, < 3.14
 - PyTorch >= 2.0.0
-- CUDA-capable GPU (for Triton acceleration)
-- Triton >= 2.0.0 (optional, for GPU acceleration)
-- Flash Attention >= 2.0.0 (optional, for optimized attention)
+- NumPy >= 1.20.0
+
+**Optional (for GPU acceleration):**
+- CUDA-capable GPU
+- Triton >= 2.0.0 (for Triton kernels)
+- Flash Attention >= 2.0.0 (for optimized attention)
 
 **Installation:**
 
 ```bash
+# Basic installation (CPU/PyTorch backend only)
 pip install trinix
+
+# With GPU acceleration (Triton + Flash Attention)
+pip install trinix[gpu]
+
+# With all optional dependencies
+pip install trinix[all]
 ```
 
 **Install from Source:**
 
 ```bash
+# Basic installation
 pip install -U git+https://github.com/IMvision12/trinix
+
+# With GPU support
+pip install -U "trinix[gpu] @ git+https://github.com/IMvision12/trinix"
 ```
 
 **Basic Usage:**
