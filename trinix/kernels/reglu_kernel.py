@@ -31,13 +31,14 @@ def reglu_forward_kernel(
     mask = col_offsets < n_cols
     Y_ptr += row_idx * Y_row_stride
     X_ptr += row_idx * X_row_stride
-    x1 = tl.load(X_ptr + col_offsets, mask=mask, other=0.0)
-    x2 = tl.load(X_ptr + col_offsets + n_cols, mask=mask, other=0.0)
-    x1_f32 = x1.to(tl.float32)
-    x2_f32 = x2.to(tl.float32)
-    relu_x2 = tl.maximum(x2_f32, 0.0)
-    output = x1_f32 * relu_x2
-    tl.store(Y_ptr + col_offsets, output.to(x1.dtype), mask=mask)
+    
+    x1 = tl.load(X_ptr + col_offsets, mask=mask, other=0.0).to(tl.float32)
+    x2 = tl.load(X_ptr + col_offsets + n_cols, mask=mask, other=0.0).to(tl.float32)
+    
+    relu_x2 = tl.maximum(x2, 0.0)
+    output = x1 * relu_x2
+    
+    tl.store(Y_ptr + col_offsets, output, mask=mask)
 
 
 @triton.jit
@@ -54,6 +55,7 @@ def reglu_backward_kernel(
     """ReGLU backward kernel.
 
     Computes gradients for ReGLU activation with respect to both input halves.
+    Gradients: dL/dx1 = dL/dy * ReLU(x2), dL/dx2 = dL/dy * x1 * (x2 > 0)
 
     Args:
         dY_ptr: Pointer to output gradient tensor.
@@ -71,18 +73,18 @@ def reglu_backward_kernel(
     dY_ptr += row_idx * dY_row_stride
     X_ptr += row_idx * X_row_stride
     dX_ptr += row_idx * dX_row_stride
-    dY = tl.load(dY_ptr + col_offsets, mask=mask, other=0.0)
-    x1 = tl.load(X_ptr + col_offsets, mask=mask, other=0.0)
-    x2 = tl.load(X_ptr + col_offsets + n_cols, mask=mask, other=0.0)
-    dY_f32 = dY.to(tl.float32)
-    x1_f32 = x1.to(tl.float32)
-    x2_f32 = x2.to(tl.float32)
-    relu_x2 = tl.maximum(x2_f32, 0.0)
-    dX1 = dY_f32 * relu_x2
-    drelu_dx2 = tl.where(x2_f32 > 0.0, 1.0, 0.0)
-    dX2 = dY_f32 * x1_f32 * drelu_dx2
-    tl.store(dX_ptr + col_offsets, dX1.to(x1.dtype), mask=mask)
-    tl.store(dX_ptr + col_offsets + n_cols, dX2.to(x2.dtype), mask=mask)
+    
+    dy = tl.load(dY_ptr + col_offsets, mask=mask, other=0.0).to(tl.float32)
+    x1 = tl.load(X_ptr + col_offsets, mask=mask, other=0.0).to(tl.float32)
+    x2 = tl.load(X_ptr + col_offsets + n_cols, mask=mask, other=0.0).to(tl.float32)
+    
+    relu_x2 = tl.maximum(x2, 0.0)
+    dx1 = dy * relu_x2
+    
+    dx2 = tl.where(x2 > 0.0, dy * x1, 0.0)
+    
+    tl.store(dX_ptr + col_offsets, dx1, mask=mask)
+    tl.store(dX_ptr + col_offsets + n_cols, dx2, mask=mask)
 
 
 class TritonReGLUFunction(torch.autograd.Function):
@@ -118,12 +120,16 @@ class TritonReGLUFunction(torch.autograd.Function):
         dim = shape[-1]
         assert dim % 2 == 0, "Last dimension must be even for ReGLU"
         hidden_dim = dim // 2
+        
         X = X.view(-1, dim)
         n_rows, n_cols_full = X.shape
         n_cols = hidden_dim
+        
         BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(n_cols)
         device = X.device
+        
         Y = torch.empty((n_rows, n_cols), dtype=X.dtype, device=device)
+        
         reglu_forward_kernel[n_rows,](
             Y,
             Y.stride(0),
@@ -133,9 +139,11 @@ class TritonReGLUFunction(torch.autograd.Function):
             BLOCK_SIZE=BLOCK_SIZE,
             num_warps=num_warps,
         )
+        
         ctx.BLOCK_SIZE = BLOCK_SIZE
         ctx.num_warps = num_warps
         ctx.save_for_backward(X)
+        
         output_shape = shape[:-1] + (hidden_dim,)
         return Y.view(*output_shape)
 
@@ -143,12 +151,15 @@ class TritonReGLUFunction(torch.autograd.Function):
     def backward(ctx, dY):
         shape = dY.shape
         hidden_dim = shape[-1]
+        
         dY = dY.view(-1, hidden_dim)
         (X,) = ctx.saved_tensors
         n_rows, n_cols_full = X.shape
         n_cols = hidden_dim
         device = dY.device
+        
         dX = torch.empty_like(X)
+        
         reglu_backward_kernel[n_rows,](
             dY,
             dY.stride(0),
@@ -160,6 +171,7 @@ class TritonReGLUFunction(torch.autograd.Function):
             BLOCK_SIZE=ctx.BLOCK_SIZE,
             num_warps=ctx.num_warps,
         )
+        
         input_shape = shape[:-1] + (n_cols_full,)
         return dX.view(*input_shape)
 

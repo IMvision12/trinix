@@ -27,12 +27,14 @@ def quickgelu_forward_kernel(
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
-    x = tl.load(X_ptr + offsets, mask=mask, other=0.0)
-    x_f32 = x.to(tl.float32)
-    sigmoid_arg = 1.702 * x_f32
+    
+    x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
+    
+    sigmoid_arg = 1.702 * x
     sigmoid_val = tl.sigmoid(sigmoid_arg)
-    output = x_f32 * sigmoid_val
-    tl.store(Y_ptr + offsets, output.to(x.dtype), mask=mask)
+    output = x * sigmoid_val
+    
+    tl.store(Y_ptr + offsets, output, mask=mask)
 
 
 @triton.jit
@@ -46,6 +48,7 @@ def quickgelu_backward_kernel(
     """QuickGELU activation backward kernel.
 
     Computes gradient of QuickGELU activation with respect to input.
+    Gradient: d/dx[x * sigmoid(1.702 * x)] = sigmoid(1.702 * x) + x * sigmoid'(1.702 * x) * 1.702
 
     Args:
         dX_ptr: Pointer to input gradient tensor.
@@ -58,16 +61,18 @@ def quickgelu_backward_kernel(
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
-    dY = tl.load(dY_ptr + offsets, mask=mask, other=0.0)
-    x = tl.load(X_ptr + offsets, mask=mask, other=0.0)
-    dY_f32 = dY.to(tl.float32)
-    x_f32 = x.to(tl.float32)
+    
+    x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
+    dy = tl.load(dY_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
+    
     alpha = 1.702
-    sigmoid_arg = alpha * x_f32
+    sigmoid_arg = alpha * x
     sigmoid_val = tl.sigmoid(sigmoid_arg)
-    dsigmoid = sigmoid_val * (1.0 - sigmoid_val)
-    dX = dY_f32 * (sigmoid_val + x_f32 * dsigmoid * alpha)
-    tl.store(dX_ptr + offsets, dX.to(x.dtype), mask=mask)
+    
+    dsigmoid = sigmoid_val * (1.0 - sigmoid_val)    
+    dx = dy * (sigmoid_val + x * dsigmoid * alpha)
+    
+    tl.store(dX_ptr + offsets, dx, mask=mask)
 
 
 class TritonQuickGELUFunction(torch.autograd.Function):
@@ -104,10 +109,9 @@ class TritonQuickGELUFunction(torch.autograd.Function):
         n_elements = X_flat.numel()
 
         BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(n_elements)
-
         grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
-
         Y = torch.empty_like(X_flat)
+        
         quickgelu_forward_kernel[grid](
             Y,
             X_flat,
@@ -115,10 +119,12 @@ class TritonQuickGELUFunction(torch.autograd.Function):
             BLOCK_SIZE=BLOCK_SIZE,
             num_warps=num_warps,
         )
+        
         ctx.save_for_backward(X_flat)
         ctx.n_elements = n_elements
         ctx.BLOCK_SIZE = BLOCK_SIZE
         ctx.num_warps = num_warps
+        
         return Y.view(*shape)
 
     @staticmethod
@@ -128,7 +134,6 @@ class TritonQuickGELUFunction(torch.autograd.Function):
         (X_flat,) = ctx.saved_tensors
 
         grid = lambda meta: (triton.cdiv(ctx.n_elements, meta["BLOCK_SIZE"]),)
-
         dX = torch.empty_like(X_flat)
         quickgelu_backward_kernel[grid](
             dX,
@@ -138,6 +143,7 @@ class TritonQuickGELUFunction(torch.autograd.Function):
             BLOCK_SIZE=ctx.BLOCK_SIZE,
             num_warps=ctx.num_warps,
         )
+        
         return dX.view(*shape)
 
 
