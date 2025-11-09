@@ -258,21 +258,90 @@ rope = FastRoPEPositionEmbedding(dim=64)  # Chooses best backend automatically
 
 ## 🥇 Performance Benchmarking
 
-Trinix automatically selects the optimal backend based on:
+Comprehensive benchmarks on **NVIDIA A100** (40GB/80GB) with **CUDA 12.6** and **PyTorch 2.8.0**:
 
-- **Hardware**: CUDA availability and compute capability
-- **Tensor Size**: Larger tensors benefit more from Triton
-- **Sequence Length**: Longer sequences see greater speedups
-- **Model Scale**: Optimized for LLM-scale workloads
+### 🎯 Attention Mechanisms
 
-Example speedups on NVIDIA A100 (40GB):
+**Training (Forward + Backward):**
 
-| Component | Configuration | Speedup |
-|-----------|--------------|---------|
-| RoPE | LLaMA-7B scale (4096 hidden, 2048 seq) | 2.1x |
-| ALiBi | 32 heads, 2048 sequence | 1.8x |
-| LayerNorm | 8192 hidden dim | 1.5x |
-| SwiGLU | 4096→11008 expansion | 1.7x |
+| Attention Type | Best Backend | Total Speedup | Backward Speedup | Use Case |
+|----------------|--------------|---------------|------------------|----------|
+| **Self-Attention** | Triton | **2.50-3.86x** | **7.47-17.15x** 🔥 | GPT-style models |
+| **Multi-Head (MHA)** | Triton | **2.52-3.47x** | **7.72-17.02x** 🔥 | Standard transformers |
+| **Grouped Query (GQA)** | Triton | **2.34-4.84x** | **7.59-15.59x** | LLaMA 2, Mistral |
+| **Multi-Query (MQA)** | Triton | **2.42-3.64x** | **7.57-15.43x** | PaLM, StarCoder |
+| **Latent Attention** | Triton/Flash | **1.66-2.11x** | **4.43-10.31x** | Long context |
+
+**Inference (Forward Only):**
+
+| Attention Type | Flash Speedup | Best Configuration |
+|----------------|---------------|-------------------|
+| Self-Attention | **1.76-3.20x** | SeqLen=2048, Heads=12 |
+| GQA | **1.92-3.27x** | SeqLen=2048, 32 heads, 8 KV heads |
+| MQA | **2.19-3.17x** | SeqLen=4096, 32 heads |
+
+**Key Insight**: Triton dominates training with exceptional backward pass speedup (up to **17x**). Flash Attention excels for inference.
+
+[📊 Full Attention Benchmarks](benchmarks/ATTENTION.md)
+
+---
+
+### 🎨 Activation Functions
+
+| Activation | Total Speedup | Forward Speedup | Use Case |
+|------------|---------------|-----------------|----------|
+| **Mish** | **2.82-3.01x** | **3.36-3.41x** 🔥 | Smooth activation |
+| **QuickGELU** | **2.83-2.93x** | **3.34-3.41x** | Fast GELU approximation |
+| **SquaredReLU** | **1.92-1.98x** | **1.95-1.97x** | Efficient, used in Primer |
+| **SwiGLU** | **1.44-1.88x** | **1.88-1.90x** | LLaMA, PaLM (standard) |
+| **GeGLU** | **1.60-1.87x** | **1.78-1.93x** | T5, Switch Transformer |
+| **ReGLU** | **1.45-2.17x** | **1.85-1.87x** | Efficient GLU variant |
+
+**Summary**: Average **2.22x** speedup across 24 tests. Non-GLU activations (Mish, QuickGELU) show best speedups.
+
+[📊 Full Activation Benchmarks](benchmarks/ACTIVATION.md)
+
+---
+
+### 📍 Position Embeddings
+
+| Method | Total Speedup | Forward Speedup | Memory Efficiency |
+|--------|---------------|-----------------|-------------------|
+| **RoPE** | **1.83-2.92x** | **2.10-4.78x** | ✅ Excellent (handles 8K+ seq) |
+| **ALiBi** | **2.28-2.30x** | **5.84-5.88x** 🔥 | ⚠️ High (OOM at 8K seq) |
+
+**Key Insight**: RoPE scales better for long sequences. ALiBi has outstanding forward speedup but high memory usage.
+
+[📊 Full Embedding Benchmarks](benchmarks/EMBEDDINGS.md)
+
+---
+
+### 📊 Normalization Layers
+
+| Layer | Speedup | Best Configuration | Use Case |
+|-------|---------|-------------------|----------|
+| **RMSNorm** | **3.64-3.78x** 🔥 | SeqLen≥4096, Hidden≥8192 | LLaMA, Mistral, Qwen |
+| **LayerNorm** | **1.54-1.59x** | Hidden>4096 | Standard transformers |
+
+**Summary**: RMSNorm shows **3.7x** consistent speedup at scale. LayerNorm falls back to PyTorch for hidden_size ≤ 4096.
+
+[📊 Full Normalization Benchmarks](benchmarks/NORMALIZATION.md)
+
+---
+
+### 🎯 Optimizers
+
+| Optimizer | Average Speedup | Best Speedup | Memory Benefit |
+|-----------|-----------------|--------------|----------------|
+| **Lion** | **4.17x** 🔥 | **4.43x** (1B params) | High (33% less than Adam) |
+| **Adam** | **3.02x** | **3.07x** (10M params) | Medium |
+| **AdamW** | **2.86x** | **2.95x** (10M params) | Medium |
+
+**Key Insight**: Lion optimizer shows best speedup and scales excellently with model size. Ideal for large-scale training.
+
+[📊 Full Optimizer Benchmarks](benchmarks/OPTIMIZER.md)
+
+---
 
 ## 🔖 License
 

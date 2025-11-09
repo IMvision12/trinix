@@ -1,25 +1,23 @@
 # Activation Functions Benchmark
 
-Performance comparison of GLU variants and activation functions with PyTorch vs Triton backends.
 
 ## Test Environment
 
 - **GPU**: NVIDIA A100-SXM4-80GB
 - **CUDA**: 12.6
 - **PyTorch**: 2.8.0+cu126
-- **Precision**: FP16
-- **Warmup**: 10 iterations
-- **Measurement**: 100 iterations
-
 ---
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| **Average Speedup** | TBD |
-| **Maximum Speedup** | TBD |
-| **Best Activation** | TBD |
+| **Average Speedup (Total)** | 2.22x |
+| **Maximum Speedup (Total)** | 3.01x |
+| **Minimum Speedup (Total)** | 1.44x |
+| **Forward Pass Avg** | 2.40x |
+| **Backward Pass Avg** | 2.18x |
+| **Best Activation** | Mish (3.41x forward), QuickGELU (3.41x forward) |
 | **Triton Threshold** | hidden_size ≥ 512 |
 
 ---
@@ -27,237 +25,123 @@ Performance comparison of GLU variants and activation functions with PyTorch vs 
 ## GLU Variants (Gated Linear Units)
 
 ### SwiGLU (Swish-Gated Linear Unit)
-**Used in: LLaMA, PaLM, GLM**
 
-| Config | PyTorch (ms) | Triton (ms) | Speedup | Memory (MB) |
-|--------|--------------|-------------|---------|-------------|
-| H=512, S=2048, B=4 | TBD | TBD | TBD | TBD |
-| H=1024, S=4096, B=2 | TBD | TBD | TBD | TBD |
-| H=2048, S=8192, B=1 | TBD | TBD | TBD | TBD |
-| H=4096, S=16384, B=1 | TBD | TBD | TBD | TBD |
-
-**Formula**: `SwiGLU(x) = Swish(xW) ⊗ xV` where `Swish(x) = x · σ(x)`
+| Config | Pass | PyTorch (ms) | Triton (ms) | Speedup |
+|--------|------|--------------|-------------|---------|
+| H=8192, S=4096, B=1 | Forward | 0.2224 | 0.1185 | 1.88x |
+| | Backward | 0.7621 | 0.5675 | 1.34x |
+| | **Total** | **0.9845** | **0.6860** | **1.44x** |
+| H=8192, S=16384, B=1 | Forward | 0.8543 | 0.4532 | 1.88x |
+| | Backward | 2.9270 | 1.6015 | 1.83x |
+| | **Total** | **3.7812** | **2.0548** | **1.84x** |
+| H=12288, S=32768, B=1 | Forward | 2.5599 | 1.3477 | 1.90x |
+| | Backward | 8.7116 | 4.6779 | 1.86x |
+| | **Total** | **11.2715** | **6.0256** | **1.87x** |
+| H=16384, S=131072, B=1 | Forward | 13.5911 | 7.1843 | 1.89x |
+| | Backward | 46.5908 | 24.7984 | 1.88x |
+| | **Total** | **60.1820** | **31.9826** | **1.88x** |
 
 ---
 
 ### GeGLU (GELU-Gated Linear Unit)
-**Used in: T5, Switch Transformer**
 
-| Config | PyTorch (ms) | Triton (ms) | Speedup | Memory (MB) |
-|--------|--------------|-------------|---------|-------------|
-| H=512, S=2048, B=4 | TBD | TBD | TBD | TBD |
-| H=1024, S=4096, B=2 | TBD | TBD | TBD | TBD |
-| H=2048, S=8192, B=1 | TBD | TBD | TBD | TBD |
-| H=4096, S=16384, B=1 | TBD | TBD | TBD | TBD |
+| Config | Pass | PyTorch (ms) | Triton (ms) | Speedup |
+|--------|------|--------------|-------------|---------|
+| H=8192, S=4096, B=1 | Forward | 0.2262 | 0.1271 | 1.78x |
+| | Backward | 0.7534 | 0.4835 | 1.56x |
+| | **Total** | **0.9796** | **0.6107** | **1.60x** |
+| H=8192, S=16384, B=1 | Forward | 0.8702 | 0.4544 | 1.92x |
+| | Backward | 2.8903 | 1.6013 | 1.80x |
+| | **Total** | **3.7605** | **2.0557** | **1.83x** |
+| H=12288, S=32768, B=1 | Forward | 2.6043 | 1.3477 | 1.93x |
+| | Backward | 8.6009 | 4.6762 | 1.84x |
+| | **Total** | **11.2051** | **6.0240** | **1.86x** |
+| H=16384, S=131072, B=1 | Forward | 13.8213 | 7.2093 | 1.92x |
+| | Backward | 45.9991 | 24.7935 | 1.86x |
+| | **Total** | **59.8204** | **32.0028** | **1.87x** |
 
-**Formula**: `GeGLU(x) = GELU(xW) ⊗ xV`
 
 ---
 
 ### ReGLU (ReLU-Gated Linear Unit)
-**Used in: Some efficient transformers**
 
-| Config | PyTorch (ms) | Triton (ms) | Speedup | Memory (MB) |
-|--------|--------------|-------------|---------|-------------|
-| H=512, S=2048, B=4 | TBD | TBD | TBD | TBD |
-| H=1024, S=4096, B=2 | TBD | TBD | TBD | TBD |
-| H=2048, S=8192, B=1 | TBD | TBD | TBD | TBD |
-| H=4096, S=16384, B=1 | TBD | TBD | TBD | TBD |
+| Config | Pass | PyTorch (ms) | Triton (ms) | Speedup |
+|--------|------|--------------|-------------|---------|
+| H=8192, S=4096, B=1 | Forward | 0.2184 | 0.1180 | 1.85x |
+| | Backward | 0.7324 | 0.5356 | 1.37x |
+| | **Total** | **0.9508** | **0.6536** | **1.45x** |
+| H=8192, S=16384, B=1 | Forward | 0.8398 | 0.4534 | 1.85x |
+| | Backward | 2.8071 | 1.2607 | 2.23x |
+| | **Total** | **3.6469** | **1.7141** | **2.13x** |
+| H=12288, S=32768, B=1 | Forward | 2.5218 | 1.3507 | 1.87x |
+| | Backward | 8.3548 | 3.6907 | 2.26x |
+| | **Total** | **10.8766** | **5.0414** | **2.16x** |
+| H=16384, S=131072, B=1 | Forward | 13.3784 | 7.1570 | 1.87x |
+| | Backward | 44.6888 | 19.5618 | 2.28x |
+| | **Total** | **58.0672** | **26.7188** | **2.17x** |
 
-**Formula**: `ReGLU(x) = ReLU(xW) ⊗ xV`
 
 ---
 
 ## Other Activation Functions
 
 ### QuickGELU
-**Fast approximation of GELU**
 
-| Config | PyTorch (ms) | Triton (ms) | Speedup | Memory (MB) |
-|--------|--------------|-------------|---------|-------------|
-| H=512, S=2048, B=4 | TBD | TBD | TBD | TBD |
-| H=1024, S=4096, B=2 | TBD | TBD | TBD | TBD |
-| H=2048, S=8192, B=1 | TBD | TBD | TBD | TBD |
-| H=4096, S=16384, B=1 | TBD | TBD | TBD | TBD |
+| Config | Pass | PyTorch (ms) | Triton (ms) | Speedup |
+|--------|------|--------------|-------------|---------|
+| H=8192, S=4096, B=1 | Forward | 0.5432 | 0.1628 | 3.34x |
+| | Backward | 1.5947 | 0.5934 | 2.69x |
+| | **Total** | **2.1379** | **0.7562** | **2.83x** |
+| H=8192, S=16384, B=1 | Forward | 2.1249 | 0.6249 | 3.40x |
+| | Backward | 6.2031 | 2.2484 | 2.76x |
+| | **Total** | **8.3280** | **2.8733** | **2.90x** |
+| H=12288, S=32768, B=1 | Forward | 6.3568 | 1.8661 | 3.41x |
+| | Backward | 18.5087 | 6.6543 | 2.78x |
+| | **Total** | **24.8655** | **8.5204** | **2.92x** |
+| H=16384, S=131072, B=1 | Forward | 33.8809 | 9.9317 | 3.41x |
+| | Backward | 98.6172 | 35.3431 | 2.79x |
+| | **Total** | **132.4980** | **45.2748** | **2.93x** |
 
-**Formula**: `QuickGELU(x) = x · σ(1.702x)`
 
 ---
 
 ### SquaredReLU
-**Used in: Primer, some efficient architectures**
 
-| Config | PyTorch (ms) | Triton (ms) | Speedup | Memory (MB) |
-|--------|--------------|-------------|---------|-------------|
-| H=512, S=2048, B=4 | TBD | TBD | TBD | TBD |
-| H=1024, S=4096, B=2 | TBD | TBD | TBD | TBD |
-| H=2048, S=8192, B=1 | TBD | TBD | TBD | TBD |
-| H=4096, S=16384, B=1 | TBD | TBD | TBD | TBD |
+| Config | Pass | PyTorch (ms) | Triton (ms) | Speedup |
+|--------|------|--------------|-------------|---------|
+| H=8192, S=4096, B=1 | Forward | 0.3165 | 0.1626 | 1.95x |
+| | Backward | 1.1368 | 0.5937 | 1.91x |
+| | **Total** | **1.4533** | **0.7563** | **1.92x** |
+| H=8192, S=16384, B=1 | Forward | 1.2224 | 0.6231 | 1.96x |
+| | Backward | 4.4001 | 2.2491 | 1.96x |
+| | **Total** | **5.6225** | **2.8722** | **1.96x** |
+| H=12288, S=32768, B=1 | Forward | 3.6638 | 1.8630 | 1.97x |
+| | Backward | 13.1047 | 6.6569 | 1.97x |
+| | **Total** | **16.7685** | **8.5199** | **1.97x** |
+| H=16384, S=131072, B=1 | Forward | 19.5262 | 9.9016 | 1.97x |
+| | Backward | 69.8672 | 35.3158 | 1.98x |
+| | **Total** | **89.3934** | **45.2174** | **1.98x** |
 
-**Formula**: `SquaredReLU(x) = (ReLU(x))²`
 
 ---
 
 ### Mish
-**Smooth activation function**
 
-| Config | PyTorch (ms) | Triton (ms) | Speedup | Memory (MB) |
-|--------|--------------|-------------|---------|-------------|
-| H=512, S=2048, B=4 | TBD | TBD | TBD | TBD |
-| H=1024, S=4096, B=2 | TBD | TBD | TBD | TBD |
-| H=2048, S=8192, B=1 | TBD | TBD | TBD | TBD |
-| H=4096, S=16384, B=1 | TBD | TBD | TBD | TBD |
+| Config | Pass | PyTorch (ms) | Triton (ms) | Speedup |
+|--------|------|--------------|-------------|---------|
+| H=8192, S=4096, B=1 | Forward | 0.5511 | 0.1640 | 3.36x |
+| | Backward | 1.6866 | 0.6299 | 2.68x |
+| | **Total** | **2.2377** | **0.7939** | **2.82x** |
+| H=8192, S=16384, B=1 | Forward | 2.1256 | 0.6280 | 3.38x |
+| | Backward | 6.4923 | 2.2680 | 2.86x |
+| | **Total** | **8.6178** | **2.8960** | **2.98x** |
+| H=12288, S=32768, B=1 | Forward | 6.3378 | 1.8707 | 3.39x |
+| | Backward | 19.3729 | 6.7149 | 2.89x |
+| | **Total** | **25.7107** | **8.5857** | **2.99x** |
+| H=16384, S=131072, B=1 | Forward | 33.8453 | 9.9147 | 3.41x |
+| | Backward | 103.1904 | 35.5998 | 2.90x |
+| | **Total** | **137.0358** | **45.5145** | **3.01x** |
 
-**Formula**: `Mish(x) = x · tanh(softplus(x))`
-
----
-
-## Key Insights (Expected)
-
-### GLU Variants
-- ✅ **SwiGLU**: Best for modern LLMs (LLaMA, PaLM)
-- ✅ **GeGLU**: Good for encoder-decoder models (T5)
-- ✅ **ReGLU**: Fastest but less expressive
-- ✅ **Triton speedup**: Expected 1.5-2x for hidden_size ≥ 512
-
-### Activation Functions
-- ✅ **QuickGELU**: Faster than standard GELU
-- ✅ **SquaredReLU**: Simple and efficient
-- ✅ **Mish**: Smooth but computationally expensive
-- ✅ **Triton benefit**: More pronounced for complex activations
 
 ---
 
-## Recommendations
-
-### For LLM Training
-```python
-from trinix import FastSwiGLU
-
-# SwiGLU is the standard for modern LLMs
-activation = FastSwiGLU(
-    input_dim=4096,
-    hidden_dim=11008,  # Typical 2.7x expansion
-    bias=False,
-    use_triton=True  # Expected 1.7x speedup
-)
-```
-
-### For Encoder-Decoder Models
-```python
-from trinix import FastGeGLU
-
-# GeGLU works well with T5-style models
-activation = FastGeGLU(
-    input_dim=768,
-    hidden_dim=3072,  # 4x expansion
-    use_triton=True
-)
-```
-
-### For Efficient Inference
-```python
-from trinix import FastReGLU
-
-# ReGLU is fastest GLU variant
-activation = FastReGLU(
-    input_dim=2048,
-    hidden_dim=8192,
-    use_triton=True
-)
-```
-
----
-
-## Configuration Guidelines
-
-| Use Case | Activation | Hidden Dim | Expected Speedup |
-|----------|------------|------------|------------------|
-| **LLaMA-style** | SwiGLU | 11008 (2.7x) | 1.7x |
-| **T5-style** | GeGLU | 3072 (4x) | 1.6x |
-| **Efficient** | ReGLU | 8192 (4x) | 1.8x |
-| **Fast GELU** | QuickGELU | Any | 1.5x |
-| **Smooth** | Mish | Any | 1.4x |
-
----
-
-## Performance Scaling (Expected)
-
-### By Hidden Dimension
-| Hidden | Expected Speedup |
-|--------|------------------|
-| 512 | 1.3-1.5x |
-| 1024 | 1.5-1.7x |
-| 2048 | 1.6-1.8x |
-| 4096 | 1.7-2.0x |
-
-### By Sequence Length
-| SeqLen | Expected Speedup |
-|--------|------------------|
-| 2048 | 1.5x |
-| 4096 | 1.6x |
-| 8192 | 1.7x |
-| 16384 | 1.8x |
-
----
-
-## Memory Efficiency (Expected)
-
-GLU variants typically show:
-- **10-15% lower memory** usage with Triton
-- **Better memory access patterns**
-- **Reduced intermediate allocations**
-
----
-
-## Reproduce These Results
-
-```bash
-# Install dependencies
-pip install trinix torch triton
-
-# Run benchmark
-python benchmark_activation.py
-
-# Custom configuration
-python benchmark_activation.py --hidden_size 4096 --seq_len 8192
-```
-
----
-
-## Implementation Notes
-
-### SwiGLU Architecture
-```
-Input: [batch, seq_len, input_dim]
-  ↓
-Split into two paths:
-  Path 1: Linear(input_dim → hidden_dim)
-  Path 2: Linear(input_dim → hidden_dim)
-  ↓
-Path 1: Apply Swish activation
-  ↓
-Element-wise multiply: Path1 ⊗ Path2
-  ↓
-Output: [batch, seq_len, hidden_dim]
-```
-
-### Triton Optimization
-- **Fused operations**: Activation + gating in single kernel
-- **Memory coalescing**: Optimized memory access patterns
-- **Reduced overhead**: Fewer kernel launches
-
----
-
-## Related Benchmarks
-
-- [Attention Layers](ATTENTION.md)
-- [Normalization Layers](NORMALIZATION.md)
-- [Position Embeddings](EMBEDDINGS.md)
-- [Complete Results](BENCHMARK_RESULTS.md)
-
----
-
-*Last updated: 2025-01-07*
-*Benchmarked on NVIDIA A100-SXM4-80GB*
-*Results pending - run benchmark_activation.py to populate*

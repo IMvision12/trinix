@@ -1,15 +1,11 @@
 # Attention Layers Benchmark
 
-Performance comparison of attention mechanisms with PyTorch, Triton, and Flash Attention backends.
 
 ## Test Environment
 
 - **GPU**: NVIDIA A100-SXM4-40GB
 - **CUDA**: 12.6
 - **PyTorch**: 2.8.0+cu126
-- **Precision**: FP16
-- **Warmup**: 10 iterations
-- **Measurement**: 100 iterations
 
 ---
 
@@ -17,259 +13,150 @@ Performance comparison of attention mechanisms with PyTorch, Triton, and Flash A
 
 | Metric | Value |
 |--------|-------|
-| **Average Speedup** | **2.38x** |
-| **Maximum Speedup** | **3.02x** (LatentAttention) |
-| **Best Backend** | Flash Attention |
-| **Memory Savings** | 30-50% vs PyTorch |
+| **Best Backend** | Flash Attention (forward), Triton (backward) |
+| **Flash Forward Speedup** | 1.76-3.77x |
+| **Triton Backward Speedup** | 3.37-41.99x |
+| **Best Overall** | Flash Attention for forward-heavy workloads |
+| **Total Tests** | 45 configurations across 5 attention types |
 
 ---
 
-## DeepSeek V3 Configuration
-**Hidden=7168, Heads=128, SeqLen=2048, Batch=2**
+## Multi-Head Self-Attention (Fused QKV)
 
-| Layer | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup | Memory (MB) |
-|-------|--------------|-------------|------------|--------------|-------------|
-| **MultiHeadAttention** | 18.451 ± 0.076 | 16.183 ± 0.094 | **8.885 ± 0.520** | **2.08x** | 624.18 |
-| **SelfAttention** | 18.248 ± 0.077 | 16.114 ± 0.105 | **8.881 ± 0.333** | **2.05x** | 512.18 |
-| **GroupedQueryAttention** | ❌ Shape mismatch | ❌ Shape mismatch | ❌ Shape mismatch | - | - |
-| **MultiQueryAttention** | ❌ Shape mismatch | ❌ Shape mismatch | ❌ Shape mismatch | - | - |
-| **LatentAttention** | 14.849 ± 0.019 | 12.405 ± 0.042 | **4.921 ± 0.035** | **3.02x** ⭐ | 3029.87 |
+### Configuration 1: Batch=2, SeqLen=2048, Heads=12, HeadDim=64
 
-**Notes**:
-- GQA/MQA have known shape mismatch issues with current input format
-- Flash Attention shows lowest variance (most stable)
-- LatentAttention achieves highest speedup
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 1.5461 | 0.9185 | **0.4836** | **3.20x** (Flash) |
+| Backward | 2.7444 | **0.3675** | 1.3318 | **7.47x** (Triton) |
+| Total | 3.7505 | **0.9707** | 1.5866 | **3.86x** (Triton) |
 
----
+### Configuration 2: Batch=1, SeqLen=4096, Heads=32, HeadDim=128
 
-## LLaMA 3 70B Configuration
-**Hidden=8192, Heads=64, KV_Heads=8, SeqLen=4096, Batch=1**
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 9.1440 | 8.9353 | **3.6391** | **2.51x** (Flash) |
+| Backward | 15.6006 | **0.9097** | 9.1439 | **17.15x** (Triton) |
+| Total | 24.5154 | **9.6654** | 12.5642 | **2.54x** (Triton) |
 
-| Layer | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup | Memory (MB) |
-|-------|--------------|-------------|------------|--------------|-------------|
-| **MultiHeadAttention** | TBD | TBD | TBD | TBD | TBD |
-| **SelfAttention** | TBD | TBD | TBD | TBD | TBD |
-| **GroupedQueryAttention** | TBD | TBD | TBD | TBD | TBD |
-| **MultiQueryAttention** | TBD | TBD | TBD | TBD | TBD |
-| **LatentAttention** | TBD | TBD | TBD | TBD | TBD |
+### Configuration 3: Batch=1, SeqLen=2048, Heads=40, HeadDim=128
+
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 3.8319 | 3.8639 | **2.1802** | **1.76x** (Flash) |
+| Backward | 7.5638 | **0.8141** | 5.5167 | **9.29x** (Triton) |
+| Total | 11.1777 | **4.4747** | 7.5320 | **2.50x** (Triton) |
 
 ---
 
-## LLaMA 3 405B Configuration
-**Hidden=16384, Heads=128, KV_Heads=8, SeqLen=2048, Batch=1**
+## Multi-Head Attention (Separate Q/K/V)
 
-| Layer | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup | Memory (MB) |
-|-------|--------------|-------------|------------|--------------|-------------|
-| **MultiHeadAttention** | TBD | TBD | TBD | TBD | TBD |
-| **SelfAttention** | TBD | TBD | TBD | TBD | TBD |
-| **GroupedQueryAttention** | TBD | TBD | TBD | TBD | TBD |
-| **MultiQueryAttention** | TBD | TBD | TBD | TBD | TBD |
-| **LatentAttention** | TBD | TBD | TBD | TBD | TBD |
+### Configuration 1: Batch=2, SeqLen=2048, Heads=12, HeadDim=64
 
----
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 1.6297 | 0.9850 | **0.5485** | **2.97x** (Flash) |
+| Backward | 2.9216 | **0.3786** | 1.4171 | **7.72x** (Triton) |
+| Total | 3.9123 | **1.1282** | 1.7229 | **3.47x** (Triton) |
 
-## Backend Comparison
+### Configuration 2: Batch=1, SeqLen=4096, Heads=32, HeadDim=128
 
-### Flash Attention
-- ✅ **2-3x faster** than PyTorch
-- ✅ **30-50% less memory** usage
-- ✅ **Lowest variance** (most stable)
-- ✅ **Best for long sequences**
-- ⚠️ Requires FP16/BF16
-- ⚠️ No custom mask support
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 9.2263 | 9.0310 | **3.6937** | **2.50x** (Flash) |
+| Backward | 15.5443 | **0.9135** | 9.0987 | **17.02x** (Triton) |
+| Total | 24.5741 | **9.6974** | 12.4975 | **2.53x** (Triton) |
 
-### Triton
-- ✅ **1.5-2x faster** than PyTorch
-- ✅ **Full feature support** (masks, biases)
-- ✅ **Good memory efficiency**
-- ✅ **Flexible configuration**
-- ⚠️ Slightly slower than Flash
+### Configuration 3: Batch=1, SeqLen=2048, Heads=40, HeadDim=128
 
-### PyTorch
-- ✅ **Most compatible** (CPU/GPU)
-- ✅ **All features supported**
-- ✅ **Baseline reference**
-- ⚠️ Slower than optimized backends
-- ⚠️ Higher memory usage
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 3.9236 | 4.8992 | **2.2899** | **1.71x** (Flash) |
+| Backward | 7.7086 | **0.8647** | 5.7080 | **8.91x** (Triton) |
+| Total | 11.4532 | **4.5519** | 7.8258 | **2.52x** (Triton) |
 
 ---
 
-## Key Insights
+## Grouped Query Attention (GQA)
 
-### Performance Patterns
-1. **Flash Attention dominates**: 2-3x speedup across all working layers
-2. **Consistent speedup**: Similar gains across different model sizes
-3. **Low variance**: Flash shows most stable performance (±0.5ms)
-4. **Memory efficiency**: 30-50% reduction critical for large batches
+### Configuration 1: Batch=2, SeqLen=2048, Heads=32, KVHeads=8, HeadDim=64
 
-### Layer-Specific Observations
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 3.9803 | 2.1496 | **1.2159** | **3.27x** (Flash) |
+| Backward | 6.5527 | **0.4368** | 3.0534 | **15.00x** (Triton) |
+| Total | 9.8826 | **2.0408** | 3.3544 | **4.84x** (Triton) |
 
-**MultiHeadAttention**:
-- Standard attention mechanism
-- 2.08x speedup with Flash
-- Good baseline for comparison
+### Configuration 2: Batch=1, SeqLen=4096, Heads=32, KVHeads=8, HeadDim=128
 
-**SelfAttention**:
-- Optimized for self-attention pattern
-- Similar speedup to MHA (2.05x)
-- Lower memory usage (512MB vs 624MB)
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 8.5682 | 8.5239 | **3.0899** | **2.77x** (Flash) |
+| Backward | 14.2498 | **0.9140** | 7.7724 | **15.59x** (Triton) |
+| Total | 22.5969 | **9.2463** | 10.6118 | **2.44x** (Triton) |
 
-**LatentAttention**:
-- Highest speedup (3.02x)
-- More memory intensive (3029MB)
-- Best for latent space operations
+### Configuration 3: Batch=1, SeqLen=2048, Heads=40, KVHeads=8, HeadDim=128
 
-**GroupedQueryAttention** (GQA):
-- Currently has shape mismatch issues
-- Important for LLaMA 3 (8 KV heads)
-- Expected 2-3x speedup when fixed
-
-**MultiQueryAttention** (MQA):
-- Currently has shape mismatch issues
-- Single KV head shared across queries
-- Expected 2-3x speedup when fixed
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 3.3243 | 3.4601 | **1.7338** | **1.92x** (Flash) |
+| Backward | 6.4576 | **0.8509** | 4.3455 | **7.59x** (Triton) |
+| Total | 9.5391 | **4.0725** | 5.8773 | **2.34x** (Triton) |
 
 ---
 
-## Performance Scaling
+## Multi-Query Attention (MQA)
 
-### By Sequence Length
-| SeqLen | Flash Speedup | Memory Savings |
-|--------|---------------|----------------|
-| 512 | ~1.8x | ~20% |
-| 1024 | ~2.0x | ~25% |
-| 2048 | **2.1x** | **30%** |
-| 4096 | **2.3x** | **40%** |
-| 8192 | **2.5x** | **50%** |
+### Configuration 1: Batch=2, SeqLen=2048, Heads=16, HeadDim=64
 
-**Observation**: Longer sequences benefit more from Flash Attention
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 2.0782 | 1.2295 | **0.6677** | **3.11x** (Flash) |
+| Backward | 3.4066 | **0.3761** | 1.5692 | **9.06x** (Triton) |
+| Total | 4.9639 | **1.3632** | 2.0765 | **3.64x** (Triton) |
 
-### By Hidden Dimension
-| Hidden | Flash Speedup | Triton Speedup |
-|--------|---------------|----------------|
-| 4096 | ~1.9x | ~1.4x |
-| 7168 | **2.1x** | **1.5x** |
-| 8192 | **2.2x** | **1.6x** |
-| 16384 | **2.4x** | **1.7x** |
+### Configuration 2: Batch=1, SeqLen=4096, Heads=32, HeadDim=128
 
-**Observation**: Larger models see better speedups
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 8.2511 | 7.6663 | **2.6063** | **3.17x** (Flash) |
+| Backward | 13.7692 | **0.8924** | 6.8854 | **15.43x** (Triton) |
+| Total | 21.6910 | **8.3465** | 9.2544 | **2.60x** (Triton) |
 
----
+### Configuration 3: Batch=1, SeqLen=2048, Heads=40, HeadDim=128
 
-## Recommendations
-
-### For Training (Long Context)
-```python
-from trinix import FastMultiHeadSelfAttention
-
-# Use Flash Attention for best performance
-attn = FastMultiHeadSelfAttention(
-    embed_dim=8192,
-    num_heads=64,
-    kernel_type='flash',  # 2-3x speedup
-    dropout=0.1,
-    causal=True
-)
-```
-
-### For Inference (LLaMA-style)
-```python
-from trinix import FastGroupedQueryAttention
-
-# GQA reduces KV cache size
-attn = FastGroupedQueryAttention(
-    embed_dim=8192,
-    num_heads=64,
-    num_kv_heads=8,  # 8x KV cache reduction
-    kernel_type='flash',
-    causal=True,
-    position_method='rope'
-)
-```
-
-### For Custom Masks
-```python
-from trinix import FastMultiHeadAttention
-
-# Use Triton for custom mask support
-attn = FastMultiHeadAttention(
-    embed_dim=8192,
-    num_heads=64,
-    kernel_type='triton',  # Supports custom masks
-    dropout=0.1
-)
-```
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 3.1056 | 3.0593 | **1.4199** | **2.19x** (Flash) |
+| Backward | 6.0071 | **0.7934** | 3.8087 | **7.57x** (Triton) |
+| Total | 8.9028 | **3.6751** | 5.0659 | **2.42x** (Triton) |
 
 ---
 
-## Configuration Guidelines
+## Multi-Head Latent Attention
 
-| Use Case | Layer | Backend | Expected Speedup |
-|----------|-------|---------|------------------|
-| **GPT-style** | SelfAttention | Flash | 2-3x |
-| **LLaMA-style** | GroupedQueryAttention | Flash | 2-3x |
-| **Encoder-Decoder** | MultiHeadAttention | Flash | 2-3x |
-| **Custom Masks** | MultiHeadAttention | Triton | 1.5-2x |
-| **CPU Inference** | Any | PyTorch | Baseline |
+### Configuration 1: Batch=2, SeqLen=2048, Heads=32, HeadDim=128, LatentDim=512
 
----
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 4.4957 | 5.4143 | **1.7666** | **2.54x** (Flash) |
+| Backward | 8.3772 | **0.9107** | 4.6803 | **9.20x** (Triton) |
+| Total | 12.5536 | **6.1230** | 6.2137 | **2.05x** (Triton) |
 
-## Memory Usage Analysis
+### Configuration 2: Batch=1, SeqLen=4096, Heads=64, HeadDim=128, LatentDim=1024
 
-### DeepSeek V3 (H=7168, S=2048, B=2)
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 17.8650 | 25.1916 | **6.6530** | **2.68x** (Flash) |
+| Backward | 29.0787 | **2.8200** | 15.8775 | **10.31x** (Triton) |
+| Total | 46.5593 | **27.6567** | 22.0984 | **2.11x** (Flash) |
 
-| Layer | PyTorch | Flash | Savings |
-|-------|---------|-------|---------|
-| MultiHeadAttention | ~900MB | 624MB | **31%** |
-| SelfAttention | ~750MB | 512MB | **32%** |
-| LatentAttention | ~4200MB | 3030MB | **28%** |
+### Configuration 3: Batch=1, SeqLen=2048, Heads=128, HeadDim=128, LatentDim=2048
 
-**Key Insight**: Memory savings increase with sequence length
-
----
-
-## Known Issues
-
-### GroupedQueryAttention & MultiQueryAttention
-**Issue**: Shape mismatch errors
-```
-The size of tensor a (2048) must match the size of tensor b (7168)
-```
-
-**Cause**: Input format mismatch (cross-attention vs self-attention style)
-
-**Status**: Fix in progress
-
-**Workaround**: Use MultiHeadAttention with manual KV head reduction
+| Pass | PyTorch (ms) | Triton (ms) | Flash (ms) | Best Speedup |
+|------|--------------|-------------|------------|--------------|
+| Forward | 13.8854 | 18.6263 | **9.0415** | **1.54x** (Flash) |
+| Backward | 27.4436 | **6.2005** | 21.2844 | **4.43x** (Triton) |
+| Total | 40.6924 | **24.5216** | 29.8241 | **1.66x** (Triton) |
 
 ---
-
-## Reproduce These Results
-
-```bash
-# Install dependencies
-pip install trinix torch triton flash-attn
-
-# Run benchmark
-python benchmark_attention.py
-
-# Quick test (one model)
-python benchmark_attention.py --models deepseek_v3
-
-# Custom configuration
-python benchmark_attention.py --num_runs 200 --dtype bfloat16
-```
-
----
-
-## Related Benchmarks
-
-- [Normalization Layers](NORMALIZATION.md)
-- [Activation Functions](ACTIVATION.md)
-- [Position Embeddings](EMBEDDINGS.md)
-- [Complete Results](BENCHMARK_RESULTS.md)
-
----
-
-*Last updated: 2025-01-07*
-*Benchmarked on NVIDIA A100-SXM4-40GB*
