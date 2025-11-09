@@ -1,8 +1,8 @@
 # Trinix 🚀
 
-High-performance PyTorch library providing drop-in replacements for neural network layers with automatic backend selection between optimized Triton kernels and PyTorch implementations. Accelerate training and inference of large language models (LLMs) and transformer architectures without code changes.
+High-performance PyTorch layers library providing optimized implementations in both Triton and PyTorch. Trinix offers drop-in replacements for essential deep learning components including attention mechanisms, normalization layers, activation functions, and optimizers with automatic backend selection for maximum performance.
 
-Trinix intelligently selects between Flash Attention, Triton kernels, and PyTorch backends based on hardware capabilities and workload characteristics, with graceful fallback for maximum compatibility.
+Attention layers intelligently choose between Flash Attention, Triton kernels, and PyTorch implementations, while other layers select between Triton and PyTorch backends based on your hardware capabilities and workload characteristics. When GPU acceleration isn't available, Trinix gracefully falls back to PyTorch implementations, ensuring your code runs everywhere while getting the best performance where possible.
 
 ## 🚀 Quickstart
 
