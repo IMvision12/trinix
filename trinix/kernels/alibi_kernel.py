@@ -38,16 +38,21 @@ def alibi_bias_kernel(
     batch_idx = tl.program_id(0)
     head_idx = tl.program_id(1)
     i_idx = tl.program_id(2)
+    
     j_offsets = tl.arange(0, BLOCK_SIZE_J)
     j_mask = j_offsets < seq_len
+    
     slope = tl.load(slopes_ptr + head_idx)
+    
     distances = tl.abs(i_idx - j_offsets).to(tl.float32)
     bias_values = -slope * distances
+    
     bias_offset = (
         batch_idx * stride_bias_batch
         + head_idx * stride_bias_head
         + i_idx * stride_bias_i
     )
+    
     tl.store(bias_ptr + bias_offset + j_offsets, bias_values, mask=j_mask)
 
 
@@ -94,8 +99,9 @@ class TritonALiBiFunction(torch.autograd.Function):
             device=slopes.device,
             dtype=slopes.dtype,
         )
+        
         BLOCK_SIZE_J, num_warps = calculate_triton_kernel_configuration(seq_len)
-        grid = (batch_size, num_heads, seq_len)
+        grid = (batch_size, num_heads, seq_len)        
         alibi_bias_kernel[grid](
             bias,
             slopes,
@@ -109,6 +115,7 @@ class TritonALiBiFunction(torch.autograd.Function):
             BLOCK_SIZE_J=BLOCK_SIZE_J,
             num_warps=num_warps,
         )
+        
         return bias
 
     @staticmethod
