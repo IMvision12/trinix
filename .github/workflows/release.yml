@@ -87,3 +87,8 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
+          # Option 1: Use trusted publishing (OIDC) - recommended, no token needed
+          # Requires setup on PyPI: https://pypi.org/manage/account/publishing/
+          
+          # Option 2: Use API token (uncomment if not using trusted publishing)
+          # password: ${{ secrets.PYPI_API_TOKEN }}
