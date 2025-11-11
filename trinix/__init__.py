@@ -31,6 +31,7 @@ from .layers.embeddings import (
 )
 from .layers.norm import FastLayerNorm, FastRMSNorm
 from .optim import FastAdamW
+from .aug import Compose
 
 __all__ = [
     "FastBaseAttention",
@@ -54,6 +55,9 @@ __all__ = [
     "triton_attn_func",
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
+    "Compose",
+    "OneOf",
+    "Sequential",
 ]
 
 
