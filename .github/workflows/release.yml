@@ -4,9 +4,8 @@ on:
   push:
     branches:
       - main
-    # Uncomment to only trigger on version.py changes:
-    # paths:
-    #   - 'trinix/version.py'
+    paths:
+      - 'trinix/version.py'
   workflow_dispatch:  # Allows manual trigger from GitHub Actions tab
 
 jobs:
