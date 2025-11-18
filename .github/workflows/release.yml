@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'trinix/version.py'
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   create-release:
@@ -23,7 +23,7 @@ jobs:
       - name: Get version
         id: get_version
         run: |
-          VERSION=$(grep -o '"[0-9]*\.[0-9]*\.[0-9]*"' trinix/version.py | tr -d '"')
+          VERSION=$(grep -oP '__version__\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' trinix/version.py)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create release
@@ -45,6 +45,7 @@ jobs:
           fi
 
   pypi-publish:
+    needs: create-release
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -83,8 +84,3 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
-          # Option 1: Use trusted publishing (OIDC) - recommended, no token needed
-          # Requires setup on PyPI: https://pypi.org/manage/account/publishing/
-          
-          # Option 2: Use API token (uncomment if not using trusted publishing)
-          # password: ${{ secrets.PYPI_API_TOKEN }}
