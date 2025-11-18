@@ -26,11 +26,11 @@ def squared_relu_forward_kernel(
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
-    
-    x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)    
+
+    x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     relu_x = tl.maximum(x, 0.0)
     output = relu_x * relu_x
-    
+
     tl.store(Y_ptr + offsets, output, mask=mask)
 
 
@@ -58,13 +58,13 @@ def squared_relu_backward_kernel(
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
-    
+
     x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     dy = tl.load(dY_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
-    
+
     relu_x = tl.maximum(x, 0.0)
     dx = 2.0 * relu_x * dy
-    
+
     tl.store(dX_ptr + offsets, dx, mask=mask)
 
 
@@ -104,7 +104,7 @@ class TritonSquaredReLUFunction(torch.autograd.Function):
         BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(n_elements)
         grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
 
-        Y = torch.empty_like(X_flat)        
+        Y = torch.empty_like(X_flat)
         squared_relu_forward_kernel[grid](
             Y,
             X_flat,
@@ -112,12 +112,12 @@ class TritonSquaredReLUFunction(torch.autograd.Function):
             BLOCK_SIZE=BLOCK_SIZE,
             num_warps=num_warps,
         )
-        
+
         ctx.save_for_backward(X_flat)
         ctx.n_elements = n_elements
         ctx.BLOCK_SIZE = BLOCK_SIZE
         ctx.num_warps = num_warps
-        
+
         return Y.view(*shape)
 
     @staticmethod
@@ -127,7 +127,7 @@ class TritonSquaredReLUFunction(torch.autograd.Function):
         (X_flat,) = ctx.saved_tensors
 
         grid = lambda meta: (triton.cdiv(ctx.n_elements, meta["BLOCK_SIZE"]),)
-        dX = torch.empty_like(X_flat)        
+        dX = torch.empty_like(X_flat)
         squared_relu_backward_kernel[grid](
             dX,
             dY_flat,
@@ -136,7 +136,7 @@ class TritonSquaredReLUFunction(torch.autograd.Function):
             BLOCK_SIZE=ctx.BLOCK_SIZE,
             num_warps=ctx.num_warps,
         )
-        
+
         return dX.view(*shape)
 
 

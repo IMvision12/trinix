@@ -22,16 +22,16 @@ def layernorm_forward_kernel(
     BLOCK_SIZE: tl.constexpr,
 ):
     """Layer Normalization forward pass kernel.
-    
+
     Computes layer normalization with affine transformation for a single row:
         Y = (X - mean(X)) / sqrt(var(X) + eps) * W + b
-    
+
     Each program instance processes one row independently, computing:
     1. Row mean: mean(X)
     2. Row variance: var(X) = mean((X - mean(X))^2)
     3. Normalization: (X - mean) / sqrt(var + eps)
     4. Affine transformation: normalized * W + b
-    
+
     Args:
         Y_ptr: Output tensor pointer
         Y_row_stride: Stride between rows in output
@@ -44,7 +44,7 @@ def layernorm_forward_kernel(
         n_cols: Number of columns (features) per row
         eps: Small constant for numerical stability (typically 1e-5)
         BLOCK_SIZE: Triton block size for parallel processing
-    
+
     Grid: (n_rows,) - one program per row
     """
     row_idx = tl.program_id(0)
@@ -84,22 +84,22 @@ def layernorm_backward_dx_fused(
     BLOCK_SIZE_N: tl.constexpr,
 ):
     """Layer Normalization backward pass kernel (fused dX, partial dW/dB).
-    
+
     Computes gradients for input (dX) and accumulates partial gradients for
     weights (dW) and biases (dB) using atomic operations with locks.
-    
+
     This kernel implements Triton's official parallel reduction strategy:
     - Each row computes its dX independently
     - Partial dW/dB are accumulated using locks to avoid race conditions
     - Final reduction happens in a separate kernel (layernorm_backward_dwdb)
-    
+
     Gradient formulas:
         dX = (dY * W - mean(dY * W * X_hat) * X_hat - mean(dY * W)) * rstd
         dW = sum(dY * X_hat) over all rows
         dB = sum(dY) over all rows
-    
+
     where X_hat = (X - mean) * rstd (normalized input)
-    
+
     Args:
         DX_ptr: Output gradient w.r.t. input pointer
         DY_ptr: Input gradient w.r.t. output pointer
@@ -114,28 +114,28 @@ def layernorm_backward_dx_fused(
         N: Number of columns (features)
         GROUP_SIZE_M: Number of lock groups for parallel accumulation
         BLOCK_SIZE_N: Block size for column processing
-    
+
     Grid: (n_rows,) - one program per row
-    
+
     Note: Uses atomic operations with locks to safely accumulate dW/dB across
     multiple rows. Each row is assigned to a lock group (row % GROUP_SIZE_M).
     """
     row = tl.program_id(0)
     cols = tl.arange(0, BLOCK_SIZE_N)
     mask = cols < N
-    
+
     lock_id = row % GROUP_SIZE_M
     Lock = Lock_ptr + lock_id
     Count = Lock_ptr + GROUP_SIZE_M + lock_id
     DW = DW_ptr + lock_id * N + cols
     DB = DB_ptr + lock_id * N + cols
-    
+
     x = tl.load(X_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
     dy = tl.load(DY_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
     w = tl.load(W_ptr + cols, mask=mask, other=0.0).to(tl.float32)
     mean = tl.load(Mean_ptr + row)
     rstd = tl.load(Rstd_ptr + row)
-    
+
     xhat = (x - mean) * rstd
     wdy = w * dy
     xhat = tl.where(mask, xhat, 0.0)
@@ -143,24 +143,24 @@ def layernorm_backward_dx_fused(
     c1 = tl.sum(xhat * wdy, axis=0) / N
     c2 = tl.sum(wdy, axis=0) / N
     dx = (wdy - (xhat * c1 + c2)) * rstd
-    
+
     tl.store(DX_ptr + row * stride + cols, dx, mask=mask)
     partial_dw = dy * xhat
     partial_db = dy
-    
+
     while tl.atomic_cas(Lock, 0, 1) == 1:
         pass
-    
+
     count = tl.load(Count)
     if count == 0:
         tl.atomic_xchg(Count, 1)
     else:
         partial_dw += tl.load(DW, mask=mask, other=0.0)
         partial_db += tl.load(DB, mask=mask, other=0.0)
-    
+
     tl.store(DW, partial_dw, mask=mask)
     tl.store(DB, partial_db, mask=mask)
-    
+
     tl.atomic_xchg(Lock, 0)
 
 
@@ -176,18 +176,18 @@ def layernorm_backward_dwdb(
     BLOCK_SIZE_N: tl.constexpr,
 ):
     """Layer Normalization backward pass - final dW/dB reduction kernel.
-    
+
     Reduces partial weight and bias gradients accumulated by multiple rows
     in the fused backward kernel into final gradients.
-    
+
     This is the second stage of Triton's parallel reduction strategy:
     - Stage 1 (layernorm_backward_dx_fused): Accumulates partial dW/dB per lock group
     - Stage 2 (this kernel): Reduces partial buffers to final dW/dB
-    
+
     Each program processes a block of columns and sums across all lock groups:
         FINAL_DW[col] = sum(DW[group, col] for group in range(M))
         FINAL_DB[col] = sum(DB[group, col] for group in range(M))
-    
+
     Args:
         DW_ptr: Partial weight gradients pointer, shape (M, N)
         DB_ptr: Partial bias gradients pointer, shape (M, N)
@@ -197,16 +197,16 @@ def layernorm_backward_dwdb(
         N: Number of columns (features)
         BLOCK_SIZE_M: Block size for row reduction
         BLOCK_SIZE_N: Block size for column processing
-    
+
     Grid: (cdiv(N, BLOCK_SIZE_N),) - one program per column block
     """
     pid = tl.program_id(0)
     cols = pid * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
     col_mask = cols < N
-    
+
     dw = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
     db = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
-    
+
     for i in range(0, M, BLOCK_SIZE_M):
         rows = i + tl.arange(0, BLOCK_SIZE_M)
         row_mask = rows < M
@@ -214,7 +214,7 @@ def layernorm_backward_dwdb(
         offs = rows[:, None] * N + cols[None, :]
         dw += tl.load(DW_ptr + offs, mask=mask, other=0.0).to(tl.float32)
         db += tl.load(DB_ptr + offs, mask=mask, other=0.0).to(tl.float32)
-    
+
     sum_dw = tl.sum(dw, axis=0)
     sum_db = tl.sum(db, axis=0)
     tl.store(FINAL_DW_ptr + cols, sum_dw, mask=col_mask)
@@ -223,44 +223,44 @@ def layernorm_backward_dwdb(
 
 class TritonLayerNormFunction(torch.autograd.Function):
     """Autograd function for Triton-accelerated Layer Normalization.
-    
+
     Implements forward and backward passes for Layer Normalization with
     learned affine transformation using optimized Triton kernels.
-    
+
     Forward Pass:
         Computes: Y = (X - mean(X)) / sqrt(var(X) + eps) * W + b
-        
+
         For each row:
         1. Compute row mean: mean(X)
         2. Compute row variance: var(X) = mean((X - mean(X))^2)
         3. Normalize: X_hat = (X - mean) / sqrt(var + eps)
         4. Apply affine: Y = X_hat * W + b
-        
+
         Saves for backward: X, W, rstd (reciprocal std), mean
-    
+
     Backward Pass (Two-Stage Parallel Reduction):
         Stage 1 (layernorm_backward_dx_fused):
             - Computes dX for each row independently
             - Accumulates partial dW/dB using atomic locks
             - Each row assigned to lock group (row % GROUP_SIZE_M)
-        
+
         Stage 2 (layernorm_backward_dwdb):
             - Reduces partial dW/dB buffers to final gradients
             - Parallel reduction across all lock groups
-        
+
         Gradient formulas:
             dX = (dY * W - mean(dY * W * X_hat) * X_hat - mean(dY * W)) * rstd
             dW = sum(dY * X_hat) over all rows
             dB = sum(dY) over all rows
-        
+
         Lock group sizing (adaptive based on feature dimension):
             - N > 8192: GROUP_SIZE_M = 64
             - N > 4096: GROUP_SIZE_M = 96
             - N > 1024: GROUP_SIZE_M = 128
             - N ≤ 1024: GROUP_SIZE_M = 256
-    
+
     """
-    
+
     @staticmethod
     def forward(ctx, X, W, b, eps):
         shape = X.shape
@@ -272,7 +272,7 @@ class TritonLayerNormFunction(torch.autograd.Function):
         Y = torch.empty((n_rows, n_cols), dtype=X.dtype, device=device)
         rstd = torch.empty(n_rows, dtype=torch.float32, device=device)
         mean = torch.empty(n_rows, dtype=torch.float32, device=device)
-        
+
         layernorm_forward_kernel[(n_rows,)](
             Y,
             Y.stride(0),
@@ -287,7 +287,7 @@ class TritonLayerNormFunction(torch.autograd.Function):
             BLOCK_SIZE=BLOCK_SIZE,
             num_warps=num_warps,
         )
-        
+
         ctx.eps = eps
         ctx.BLOCK_SIZE = BLOCK_SIZE
         ctx.num_warps = num_warps
@@ -303,7 +303,7 @@ class TritonLayerNormFunction(torch.autograd.Function):
         X = X.contiguous().view(-1, dim)
         n_rows, n_cols = dY.shape
         device = dY.device
-        
+
         GROUP_SIZE_M = 64
         if n_cols <= 8192:
             GROUP_SIZE_M = 96
@@ -311,14 +311,14 @@ class TritonLayerNormFunction(torch.autograd.Function):
             GROUP_SIZE_M = 128
         if n_cols <= 1024:
             GROUP_SIZE_M = 256
-        
+
         locks = torch.zeros(2 * GROUP_SIZE_M, dtype=torch.int32, device=device)
         _dw = torch.zeros((GROUP_SIZE_M, n_cols), dtype=dY.dtype, device=device)
         _db = torch.zeros((GROUP_SIZE_M, n_cols), dtype=dY.dtype, device=device)
         dW = torch.empty(n_cols, dtype=W.dtype, device=device)
         db = torch.empty(n_cols, dtype=W.dtype, device=device)
         dX = torch.empty_like(dY)
-        
+
         layernorm_backward_dx_fused[(n_rows,)](
             dX,
             dY,
@@ -335,10 +335,10 @@ class TritonLayerNormFunction(torch.autograd.Function):
             BLOCK_SIZE_N=ctx.BLOCK_SIZE,
             num_warps=ctx.num_warps,
         )
-        
+
         def grid(meta):
-            return (triton.cdiv(n_cols, meta['BLOCK_SIZE_N']),)
-        
+            return (triton.cdiv(n_cols, meta["BLOCK_SIZE_N"]),)
+
         layernorm_backward_dwdb[grid](
             _dw,
             _db,
@@ -349,7 +349,7 @@ class TritonLayerNormFunction(torch.autograd.Function):
             BLOCK_SIZE_M=32,
             BLOCK_SIZE_N=128,
         )
-        
+
         return (dX.view(*shape), dW, db, None)
 
 
@@ -362,41 +362,41 @@ class TritonLayerNormKernel:
     Algorithm:
         Forward:  Y = (X - mean(X)) / sqrt(var(X) + eps) * W + b
         Backward: Two-stage parallel reduction with atomic locks
-    
+
     Methods:
         is_available() -> bool:
             Check if Triton and CUDA are available.
             Returns True if both are available, False otherwise.
             Note: Even if available, kernel may not be used if hidden_size ≤ 4096.
-        
+
         apply(X, W, b, eps) -> torch.Tensor:
             Apply Layer Normalization with affine transformation.
-            
+
             Args:
                 X: Input tensor of any shape (*, N)
                 W: Weight tensor, shape (N,) - learned scale parameter
                 b: Bias tensor, shape (N,) - learned shift parameter
                 eps: Small constant for numerical stability (typically 1e-5)
-            
+
             Returns:
                 Normalized output with same shape as input
-            
+
             Performance:
                 - Best for: hidden_size > 4096, seq_len ≥ 4096
                 - Speedup: 1.5-1.6x over PyTorch
                 - Memory: Minimal overhead (only mean/rstd buffers)
-            
+
             Note:
                 - Supports automatic differentiation
                 - Uses two-stage parallel reduction for gradients
                 - Automatically selects optimal block size
-    
+
     Usage:
         >>> from trinix import FastLayerNorm
         >>> layer = FastLayerNorm(8192, use_triton=True)
         >>> x = torch.randn(4, 2048, 8192, device='cuda', dtype=torch.float16)
         >>> output = layer(x)  # Automatically uses Triton kernel
-        
+
         >>> # Or use kernel directly
         >>> from trinix.kernels import TritonLayerNormKernel
         >>> X = torch.randn(4, 2048, 8192, device='cuda', dtype=torch.float16)
@@ -410,6 +410,7 @@ class TritonLayerNormKernel:
     def is_available() -> bool:
         try:
             import triton
+
             return torch.cuda.is_available()
         except ImportError:
             return False

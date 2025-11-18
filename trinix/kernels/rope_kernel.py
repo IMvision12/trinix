@@ -57,11 +57,11 @@ def _rope_rotation_kernel(
     batch_idx = tl.program_id(0)
     seq_idx = tl.program_id(1)
     head_idx = tl.program_id(2)
-    
+
     half_dim = head_dim // 2
     dim_offsets = tl.arange(0, BLOCK_SIZE)
     mask = dim_offsets < half_dim
-    
+
     tensor_base = (
         batch_idx * stride_tensor_batch
         + seq_idx * stride_tensor_seq
@@ -69,21 +69,21 @@ def _rope_rotation_kernel(
     )
     cos_base = seq_idx * stride_cos_seq
     sin_base = seq_idx * stride_sin_seq
-    
+
     x1 = tl.load(tensor_ptr + tensor_base + dim_offsets, mask=mask, other=0.0)
     x2 = tl.load(
         tensor_ptr + tensor_base + dim_offsets + half_dim, mask=mask, other=0.0
     )
-    
+
     cos_vals = tl.load(cos_ptr + cos_base + dim_offsets, mask=mask, other=0.0)
     sin_vals = tl.load(sin_ptr + sin_base + dim_offsets, mask=mask, other=0.0)
-    
+
     if is_backward:
         sin_vals = -sin_vals
-    
+
     rotated_x1 = x1 * cos_vals - x2 * sin_vals
     rotated_x2 = x1 * sin_vals + x2 * cos_vals
-    
+
     tl.store(output_ptr + tensor_base + dim_offsets, rotated_x1, mask=mask)
     tl.store(output_ptr + tensor_base + dim_offsets + half_dim, rotated_x2, mask=mask)
 
@@ -100,11 +100,11 @@ def _apply_rope_kernel(tensor, cos, sin, is_backward=False):
     Returns:
         Rotated output tensor.
     """
-    batch_size, seq_len, num_heads, head_dim = tensor.shape    
-    output = torch.empty_like(tensor)    
+    batch_size, seq_len, num_heads, head_dim = tensor.shape
+    output = torch.empty_like(tensor)
     BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(head_dim // 2)
     grid = (batch_size, seq_len, num_heads)
-    
+
     _rope_rotation_kernel[grid](
         tensor,
         cos,
@@ -126,7 +126,7 @@ def _apply_rope_kernel(tensor, cos, sin, is_backward=False):
         BLOCK_SIZE=BLOCK_SIZE,
         num_warps=num_warps,
     )
-    
+
     return output
 
 

@@ -48,6 +48,7 @@ from trinix import (
     FastRoPEPositionEmbedding,
     FastLayerNorm,
     FastAdamW,
+    FastMuon,
 )
 
 # Create model components with automatic backend selection
@@ -65,8 +66,10 @@ x = torch.randn(4, 128, 768, device='cuda')
 attn_output = attention(x, x, x)
 normalized = layernorm(attn_output)
 
-# Optimize with FastAdamW
+# Optimize with FastAdamW or FastMuon
 optimizer = FastAdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
+# Or use FastMuon for memory-efficient optimization
+optimizer = FastMuon(model.parameters(), lr=2e-2, momentum=0.95)
 ```
 
 ## 🛠️ Components
@@ -228,16 +231,26 @@ geglu = FastGeGLU(
 - **FastAdamW**: AdamW with decoupled weight decay and Triton acceleration
 - **FastAdam**: Standard Adam optimizer with Triton kernels
 - **FastLion**: Lion optimizer (evolved sign momentum)
+- **FastMuon**: Muon optimizer (momentum with orthogonalization)
 
 ```python
-from trinix import FastAdamW
+from trinix import FastAdamW, FastMuon
 
+# AdamW optimizer
 optimizer = FastAdamW(
     model.parameters(),
     lr=1e-3,
     betas=(0.9, 0.999),
     eps=1e-8,
     weight_decay=0.01,
+    use_triton=True
+)
+
+# Muon optimizer (memory-efficient, simple momentum)
+optimizer = FastMuon(
+    model.parameters(),
+    lr=2e-2,
+    momentum=0.95,
     use_triton=True
 )
 ```
@@ -348,12 +361,13 @@ Comprehensive benchmarks on **NVIDIA A100** (40GB/80GB) with **CUDA 12.6** and *
 | Optimizer | Average Speedup | Best Speedup | Memory Benefit |
 |-----------|-----------------|--------------|----------------|
 | **Lion** | **4.17x** 🔥 | **4.43x** (1B params) | High (33% less than Adam) |
+| **Muon** | **1.14x** | **1.23x** (100M params) | High (50% less than Adam) |
 | **Adam** | **3.02x** | **3.07x** (10M params) | Medium |
 | **AdamW** | **2.86x** | **2.95x** (10M params) | Medium |
 
-**Key Insight**: Lion optimizer shows best speedup and scales excellently with model size. Ideal for large-scale training.
+**Key Insight**: Lion optimizer shows best speedup and scales excellently with model size. Muon offers maximum memory efficiency with modest speedup. Adam/AdamW provide balanced performance.
 
-[📊 Full Optimizer Benchmarks](benchmarks/OPTIMIZER.md)
+[📊 Full Optimizer Benchmarks](benchmarks/OPTIMIZER.md) | [📊 Muon Benchmarks](benchmarks/MUON_BENCHMARK.md)
 
 ---
 

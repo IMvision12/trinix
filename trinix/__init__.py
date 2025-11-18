@@ -17,6 +17,7 @@ except ImportError:
     calculate_triton_kernel_configuration = None
     get_cuda_compute_capability = None
 
+from .aug import Compose
 from .layers.activation import FastGeGLU, FastSwiGLU
 from .layers.attention import (
     FastBaseAttention,
@@ -30,8 +31,7 @@ from .layers.embeddings import (
     FastRoPEPositionEmbedding,
 )
 from .layers.norm import FastLayerNorm, FastRMSNorm
-from .optim import FastAdamW
-from .aug import Compose
+from .optim import FastAdamW, FastMuon
 
 __all__ = [
     "FastBaseAttention",
@@ -45,6 +45,7 @@ __all__ = [
     "FastSwiGLU",
     "FastGeGLU",
     "FastAdamW",
+    "FastMuon",
     "TritonAdamWKernel",
     "TritonRoPEKernel",
     "TritonALiBiKernel",

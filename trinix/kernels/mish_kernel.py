@@ -27,14 +27,14 @@ def mish_forward_kernel(
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
-    
+
     x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     softplus = tl.log(1.0 + tl.exp(x))
-    
+
     exp_2softplus = tl.exp(2.0 * softplus)
     tanh_softplus = (exp_2softplus - 1.0) / (exp_2softplus + 1.0)
-    
-    output = x * tanh_softplus    
+
+    output = x * tanh_softplus
     tl.store(Y_ptr + offsets, output, mask=mask)
 
 
@@ -62,20 +62,20 @@ def mish_backward_kernel(
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
-    
+
     x = tl.load(X_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
     dy = tl.load(dY_ptr + offsets, mask=mask, other=0.0).to(tl.float32)
-    
-    exp_x = tl.exp(x)    
+
+    exp_x = tl.exp(x)
     softplus = tl.log(1.0 + exp_x)
-    
+
     exp_2softplus = tl.exp(2.0 * softplus)
     tanh_softplus = (exp_2softplus - 1.0) / (exp_2softplus + 1.0)
-    
-    sech2_softplus = 1.0 - tanh_softplus * tanh_softplus    
+
+    sech2_softplus = 1.0 - tanh_softplus * tanh_softplus
     sigmoid_x = exp_x / (1.0 + exp_x)
-    
-    dx = dy * (tanh_softplus + x * sech2_softplus * sigmoid_x)    
+
+    dx = dy * (tanh_softplus + x * sech2_softplus * sigmoid_x)
     tl.store(dX_ptr + offsets, dx, mask=mask)
 
 
@@ -115,7 +115,7 @@ class TritonMishFunction(torch.autograd.Function):
         BLOCK_SIZE, num_warps = calculate_triton_kernel_configuration(n_elements)
         grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
         Y = torch.empty_like(X_flat)
-        
+
         mish_forward_kernel[grid](
             Y,
             X_flat,
@@ -123,12 +123,12 @@ class TritonMishFunction(torch.autograd.Function):
             BLOCK_SIZE=BLOCK_SIZE,
             num_warps=num_warps,
         )
-        
+
         ctx.save_for_backward(X_flat)
         ctx.n_elements = n_elements
         ctx.BLOCK_SIZE = BLOCK_SIZE
         ctx.num_warps = num_warps
-        
+
         return Y.view(*shape)
 
     @staticmethod
@@ -147,7 +147,7 @@ class TritonMishFunction(torch.autograd.Function):
             BLOCK_SIZE=ctx.BLOCK_SIZE,
             num_warps=ctx.num_warps,
         )
-        
+
         return dX.view(*shape)
 
 
