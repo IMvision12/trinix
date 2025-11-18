@@ -64,4 +64,4 @@ __all__ = [
 
 from .version import version
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
