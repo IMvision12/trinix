@@ -17,7 +17,6 @@ except ImportError:
     calculate_triton_kernel_configuration = None
     get_cuda_compute_capability = None
 
-from .aug import Compose
 from .layers.activation import FastGeGLU, FastSwiGLU
 from .layers.attention import (
     FastBaseAttention,
@@ -56,9 +55,6 @@ __all__ = [
     "triton_attn_func",
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
-    "Compose",
-    "OneOf",
-    "Sequential",
 ]
 
 
