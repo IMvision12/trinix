@@ -46,17 +46,13 @@ class FastLayerNorm(nn.Module):
         self.eps = eps
         self.elementwise_affine = elementwise_affine
         self.use_triton = use_triton
-        self.pytorch_layernorm = nn.LayerNorm(
-            normalized_shape=normalized_shape,
-            eps=eps,
-            elementwise_affine=elementwise_affine,
-        )
+
         if self.elementwise_affine:
-            self.weight = self.pytorch_layernorm.weight
-            self.bias = self.pytorch_layernorm.bias
+            self.weight = nn.Parameter(torch.ones(normalized_shape))
+            self.bias = nn.Parameter(torch.zeros(normalized_shape))
         else:
-            self.weight = None
-            self.bias = None
+            self.register_parameter("weight", None)
+            self.register_parameter("bias", None)
 
     def _check_triton_availability(self) -> bool:
         if not self.use_triton:
@@ -77,16 +73,22 @@ class FastLayerNorm(nn.Module):
 
     def _triton_forward(self, input: torch.Tensor) -> torch.Tensor:
         input_2d, original_shape = self._reshape_for_triton(input)
+        weight = self.weight.to(input.dtype) if self.elementwise_affine else None
+        bias = self.bias.to(input.dtype) if self.elementwise_affine else None
         output = TritonLayerNormKernel.apply(
             input_2d,
-            self.pytorch_layernorm.weight if self.elementwise_affine else None,
-            self.pytorch_layernorm.bias if self.elementwise_affine else None,
+            weight,
+            bias,
             self.eps,
         )
         return output.view(original_shape)
 
     def _pytorch_forward(self, input: torch.Tensor) -> torch.Tensor:
-        return self.pytorch_layernorm(input)
+        weight = self.weight.to(input.dtype) if self.weight is not None else None
+        bias = self.bias.to(input.dtype) if self.bias is not None else None
+        return torch.nn.functional.layer_norm(
+            input, self.normalized_shape, weight, bias, self.eps
+        )
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if input.shape[-len(self.normalized_shape) :] != self.normalized_shape:
