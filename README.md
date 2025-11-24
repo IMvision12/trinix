@@ -367,7 +367,7 @@ Comprehensive benchmarks on **NVIDIA A100** (40GB/80GB) with **CUDA 12.6** and *
 
 **Key Insight**: Lion optimizer shows best speedup and scales excellently with model size. Muon offers maximum memory efficiency with modest speedup. Adam/AdamW provide balanced performance.
 
-[📊 Full Optimizer Benchmarks](benchmarks/OPTIMIZER.md) | [📊 Muon Benchmarks](benchmarks/MUON_BENCHMARK.md)
+[📊 Full Optimizer Benchmarks](benchmarks/OPTIMIZER.md)
 
 ---
 
