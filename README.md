@@ -6,37 +6,17 @@ Attention layers intelligently choose between Flash Attention, Triton kernels, a
 
 ## 🚀 Quickstart
 
-**Requirements:**
-- Python >= 3.9, < 3.14
-- PyTorch >= 2.0.0
-- NumPy >= 1.20.0
-
-**Optional (for GPU acceleration):**
-- CUDA-capable GPU
-- Triton >= 2.0.0 (for Triton kernels)
-- Flash Attention >= 2.0.0 (for optimized attention)
-
 **Installation:**
 
 ```bash
-# Basic installation (CPU/PyTorch backend only)
+# Install trinix with all dependencies
 pip install trinix
-
-# With GPU acceleration (Triton + Flash Attention)
-pip install trinix[gpu]
-
-# With all optional dependencies
-pip install trinix[all]
 ```
 
 **Install from Source:**
 
 ```bash
-# Basic installation
 pip install -U git+https://github.com/IMvision12/trinix
-
-# With GPU support
-pip install -U "trinix[gpu] @ git+https://github.com/IMvision12/trinix"
 ```
 
 **Basic Usage:**

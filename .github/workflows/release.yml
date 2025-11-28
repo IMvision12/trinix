@@ -72,7 +72,7 @@ jobs:
       - name: Install build dependencies
         run: |
           pip install --upgrade pip setuptools wheel twine build
-          # Install only core dependencies needed for building (not flash-attn/triton)
+          # Install minimal dependencies for building (full deps installed by users at install time)
           pip install torch>=2.0.0 numpy>=1.20.0 --progress-bar off
 
       - name: Build wheels
