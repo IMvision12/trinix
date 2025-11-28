@@ -23,20 +23,12 @@ classifiers = [
 dependencies = [
     "torch>=2.0.0",
     "numpy>=1.20.0",
+    "triton>=2.0.0",
+    "flash-attn>=2.0.0",
 ]
 
 [project.optional-dependencies]
-gpu = [
-    "triton>=2.0.0",
-    "flash-attn>=2.0.0",
-]
 tests = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-]
-all = [
-    "triton>=2.0.0",
-    "flash-attn>=2.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
