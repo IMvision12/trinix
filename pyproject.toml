@@ -23,8 +23,8 @@ classifiers = [
 dependencies = [
     "torch>=2.6.0",
     "numpy>=1.20.0",
-    "triton>=3.2.0",
-    "flash-attn>=2.7.0",
+    "triton>=3.2.0; sys_platform != 'win32'",
+    "flash-attn>=2.7.0; sys_platform != 'win32'",
 ]
 
 [project.optional-dependencies]
