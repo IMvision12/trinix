@@ -17,10 +17,10 @@ def _register_fusion_patterns():
     Called lazily by trinix.fusion to avoid circular imports.
     """
     from ...fusion import register_fusion
-    from ..norm.rmsnorm import FastRMSNorm
     from ..activation.mish import FastMish
     from ..activation.quickgelu import FastQuickGELU
     from ..activation.squared_relu import FastSquaredReLU
+    from ..norm.rmsnorm import FastRMSNorm
 
     def _make_rmsnorm_mish(modules):
         norm = modules[0]

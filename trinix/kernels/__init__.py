@@ -12,6 +12,11 @@ if TRITON_AVAILABLE:
     from .adamw_kernel import TritonAdamWKernel
     from .alibi_kernel import TritonALiBiKernel
     from .attention_kernel import TritonAttentionKernel
+    from .fused import (
+        TritonFusedResidualLayerNormKernel,
+        TritonFusedResidualRMSNormKernel,
+        TritonFusedRMSNormActivationKernel,
+    )
     from .geglu_kernel import TritonGeGLUKernel
     from .layernorm_kernel import TritonLayerNormFunction, TritonLayerNormKernel
     from .lion_kernel import TritonLionKernel
@@ -23,11 +28,6 @@ if TRITON_AVAILABLE:
     from .rope_kernel import TritonRoPEKernel
     from .squared_relu_kernel import TritonSquaredReLUKernel
     from .swigelu_kernel import TritonSwiGLUKernel
-    from .fused import (
-        TritonFusedResidualRMSNormKernel,
-        TritonFusedResidualLayerNormKernel,
-        TritonFusedRMSNormActivationKernel,
-    )
     from .utils import (
         calculate_attention_block_sizes,
         calculate_triton_kernel_configuration,

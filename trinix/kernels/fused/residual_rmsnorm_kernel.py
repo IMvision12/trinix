@@ -127,7 +127,9 @@ def fused_residual_rmsnorm_backward_dx_fused(
     Count = Lock_ptr + GROUP_SIZE_M + lock_id
     DW = DW_ptr + lock_id * N + cols
 
-    sum_out = tl.load(SumOut_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
+    sum_out = tl.load(SumOut_ptr + row * stride + cols, mask=mask, other=0.0).to(
+        tl.float32
+    )
     dy = tl.load(DY_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
     w = tl.load(W_ptr + cols, mask=mask, other=0.0).to(tl.float32)
     rstd = tl.load(Rstd_ptr + row)

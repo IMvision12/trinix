@@ -1,14 +1,14 @@
 from .kernels import (
     TritonAdamWKernel,
     TritonALiBiKernel,
+    TritonFusedResidualLayerNormKernel,
+    TritonFusedResidualRMSNormKernel,
+    TritonFusedRMSNormActivationKernel,
     TritonGeGLUKernel,
     TritonLayerNormKernel,
     TritonRMSNormKernel,
     TritonRoPEKernel,
     TritonSwiGLUKernel,
-    TritonFusedResidualRMSNormKernel,
-    TritonFusedResidualLayerNormKernel,
-    TritonFusedRMSNormActivationKernel,
 )
 
 try:

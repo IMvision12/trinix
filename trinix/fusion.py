@@ -2,7 +2,6 @@ import warnings
 
 import torch.nn as nn
 
-
 # Registry: maps tuple of module types → factory function
 _FUSION_REGISTRY = {}
 _PATTERNS_REGISTERED = False

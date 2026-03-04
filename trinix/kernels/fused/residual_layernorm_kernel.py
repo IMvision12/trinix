@@ -138,7 +138,9 @@ def fused_residual_layernorm_backward_dx_fused(
     DW = DW_ptr + lock_id * N + cols
     DB = DB_ptr + lock_id * N + cols
 
-    sum_out = tl.load(SumOut_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
+    sum_out = tl.load(SumOut_ptr + row * stride + cols, mask=mask, other=0.0).to(
+        tl.float32
+    )
     dy = tl.load(DY_ptr + row * stride + cols, mask=mask, other=0.0).to(tl.float32)
     w = tl.load(W_ptr + cols, mask=mask, other=0.0).to(tl.float32)
     mean = tl.load(Mean_ptr + row)

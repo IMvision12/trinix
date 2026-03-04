@@ -8,8 +8,8 @@ except ImportError:
     TRITON_AVAILABLE = False
 
 if TRITON_AVAILABLE:
-    from .residual_rmsnorm_kernel import TritonFusedResidualRMSNormKernel
     from .residual_layernorm_kernel import TritonFusedResidualLayerNormKernel
+    from .residual_rmsnorm_kernel import TritonFusedResidualRMSNormKernel
     from .rmsnorm_activation_kernel import TritonFusedRMSNormActivationKernel
 
     __all__ = [

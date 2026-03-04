@@ -3,7 +3,6 @@ import torch.nn as nn
 
 from ...kernels.fused import TritonFusedRMSNormActivationKernel
 
-
 _SUPPORTED_ACTIVATIONS = {"mish", "quickgelu", "squared_relu"}
 
 
