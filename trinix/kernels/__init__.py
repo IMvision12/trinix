@@ -23,6 +23,11 @@ if TRITON_AVAILABLE:
     from .rope_kernel import TritonRoPEKernel
     from .squared_relu_kernel import TritonSquaredReLUKernel
     from .swigelu_kernel import TritonSwiGLUKernel
+    from .fused import (
+        TritonFusedResidualRMSNormKernel,
+        TritonFusedResidualLayerNormKernel,
+        TritonFusedRMSNormActivationKernel,
+    )
     from .utils import (
         calculate_attention_block_sizes,
         calculate_triton_kernel_configuration,
@@ -46,6 +51,9 @@ if TRITON_AVAILABLE:
         "TritonSquaredReLUKernel",
         "TritonMishKernel",
         "TritonAttentionKernel",
+        "TritonFusedResidualRMSNormKernel",
+        "TritonFusedResidualLayerNormKernel",
+        "TritonFusedRMSNormActivationKernel",
         "calculate_triton_kernel_configuration",
         "calculate_attention_block_sizes",
         "get_cuda_compute_capability",
@@ -123,6 +131,21 @@ else:
         def is_available():
             return False
 
+    class TritonFusedResidualRMSNormKernel:
+        @staticmethod
+        def is_available():
+            return False
+
+    class TritonFusedResidualLayerNormKernel:
+        @staticmethod
+        def is_available():
+            return False
+
+    class TritonFusedRMSNormActivationKernel:
+        @staticmethod
+        def is_available():
+            return False
+
     __all__ = [
         "TritonAdamWKernel",
         "TritonLionKernel",
@@ -138,4 +161,7 @@ else:
         "TritonSquaredReLUKernel",
         "TritonMishKernel",
         "TritonAttentionKernel",
+        "TritonFusedResidualRMSNormKernel",
+        "TritonFusedResidualLayerNormKernel",
+        "TritonFusedRMSNormActivationKernel",
     ]

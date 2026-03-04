@@ -6,6 +6,9 @@ from .kernels import (
     TritonRMSNormKernel,
     TritonRoPEKernel,
     TritonSwiGLUKernel,
+    TritonFusedResidualRMSNormKernel,
+    TritonFusedResidualLayerNormKernel,
+    TritonFusedRMSNormActivationKernel,
 )
 
 try:
@@ -17,6 +20,7 @@ except ImportError:
     calculate_triton_kernel_configuration = None
     get_cuda_compute_capability = None
 
+from .fusion import fuse
 from .layers.activation import FastGeGLU, FastSwiGLU
 from .layers.attention import (
     FastBaseAttention,
@@ -29,10 +33,18 @@ from .layers.embeddings import (
     FastALiBiPositionEmbedding,
     FastRoPEPositionEmbedding,
 )
+from .layers.fused import (
+    FastFusedResidualLayerNorm,
+    FastFusedResidualRMSNorm,
+    FastFusedRMSNormActivation,
+)
 from .layers.norm import FastLayerNorm, FastRMSNorm
 from .optim import FastAdamW, FastMuon
 
 __all__ = [
+    # Fusion API
+    "fuse",
+    # Layers
     "FastBaseAttention",
     "FastGroupedQueryAttention",
     "FastMultiHeadAttention",
@@ -43,8 +55,14 @@ __all__ = [
     "FastRMSNorm",
     "FastSwiGLU",
     "FastGeGLU",
+    # Fused Layers
+    "FastFusedResidualRMSNorm",
+    "FastFusedResidualLayerNorm",
+    "FastFusedRMSNormActivation",
+    # Optimizers
     "FastAdamW",
     "FastMuon",
+    # Kernels
     "TritonAdamWKernel",
     "TritonRoPEKernel",
     "TritonALiBiKernel",
@@ -52,7 +70,11 @@ __all__ = [
     "TritonRMSNormKernel",
     "TritonSwiGLUKernel",
     "TritonGeGLUKernel",
+    "TritonFusedResidualRMSNormKernel",
+    "TritonFusedResidualLayerNormKernel",
+    "TritonFusedRMSNormActivationKernel",
     "triton_attn_func",
+    # Utilities
     "calculate_triton_kernel_configuration",
     "get_cuda_compute_capability",
 ]
