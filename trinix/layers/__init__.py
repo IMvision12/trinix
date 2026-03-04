@@ -1,4 +1,4 @@
-from . import activation, attention, embeddings, norm
+from . import activation, attention, embeddings, fused, norm
 from .activation import FastGeGLU, FastSwiGLU
 from .attention import (
     FastBaseAttention,
@@ -11,12 +11,19 @@ from .embeddings import (
     FastALiBiPositionEmbedding,
     FastRoPEPositionEmbedding,
 )
+from .fused import (
+    FastFusedResidualLayerNorm,
+    FastFusedResidualRMSNorm,
+    FastFusedRMSNormActivation,
+    FusedElementwiseChain,
+)
 from .norm import FastLayerNorm, FastRMSNorm
 
 __all__ = [
     "activation",
     "attention",
     "embeddings",
+    "fused",
     "norm",
     "FastBaseAttention",
     "FastGroupedQueryAttention",
@@ -29,4 +36,8 @@ __all__ = [
     "FastRMSNorm",
     "FastSwiGLU",
     "FastGeGLU",
+    "FastFusedResidualRMSNorm",
+    "FastFusedResidualLayerNorm",
+    "FastFusedRMSNormActivation",
+    "FusedElementwiseChain",
 ]
